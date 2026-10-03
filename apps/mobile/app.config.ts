@@ -5,7 +5,7 @@ const config: ExpoConfig = {
   slug: "geomineral",
   version: "0.2.0",
   orientation: "portrait",
-  userInterfaceStyle: "light",
+  userInterfaceStyle: "automatic",
   ios: { supportsTablet: true, bundleIdentifier: "app.geomineral.explorer" },
   android: {
     package: "app.geomineral.explorer",

@@ -11,7 +11,7 @@ test("native screen preview navigation and safe scanner state", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Get Started" }).click();
   await expect(
-    page.getByRole("button", { name: "Map Explorer", exact: true }),
+    page.getByRole("button", { name: "Mineral Guide", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Mineral Guide", exact: true })
@@ -54,7 +54,7 @@ test("coordinate search reaches live analysis and report", async ({ page }) => {
     .click();
   await page.getByRole("button", { name: "Analyze Location" }).click();
   await expect(
-    page.getByText("Location Analysis", { exact: true }),
+    page.getByText("Analysis", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "View Report" }),
@@ -241,7 +241,7 @@ test("mining district shows rating, sites on the map and a full report", async (
   await page.getByRole("button", { name: "Go back" }).click();
   await page.getByRole("tab", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: /Open analysis of Kalgoorlie/ }).click();
-  await expect(page.getByText("Location Analysis", { exact: true })).toBeVisible();
+  await expect(page.getByText("Analysis", { exact: true })).toBeVisible();
   await expect(page.getByText("Gold", { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });

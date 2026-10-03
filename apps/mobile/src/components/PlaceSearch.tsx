@@ -1,22 +1,20 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { MapPin, Search } from "lucide-react-native";
 import type { Location } from "../types";
 import { api } from "../services/api";
-import { colors, ui } from "../theme";
+import { FadeIn, haptic } from "../motion";
+import { type, useTheme } from "../theme";
+
 export default function PlaceSearch({
   onSelect,
   dark,
 }: {
   onSelect: (location: Location) => void;
+  /** Glass style for use over a map. */
   dark?: boolean;
 }) {
+  const { c, ui } = useTheme();
   const [query, setQuery] = useState(""),
     [results, setResults] = useState<Location[]>([]),
     [busy, setBusy] = useState(false),
@@ -26,12 +24,9 @@ export default function PlaceSearch({
     setBusy(true);
     setError("");
     try {
-      const found = await api<Location[]>(
-        `/search?q=${encodeURIComponent(query.trim())}`,
-      );
+      const found = await api<Location[]>(`/search?q=${encodeURIComponent(query.trim())}`);
       setResults(found);
-      if (!found.length)
-        setError("No matching places. Try latitude, longitude.");
+      if (!found.length) setError("No matching places. Try latitude, longitude.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -39,21 +34,22 @@ export default function PlaceSearch({
     }
   }
   return (
-    <View style={{ gap: 9 }}>
+    <View style={{ gap: 8 }}>
       <View
-        style={[
-          ui.row,
-          {
-            backgroundColor: "#F2F5EF",
-            borderWidth: 1,
-            borderColor: "#E8ECE3",
-            borderRadius: 17,
-            minHeight: 50,
-            paddingHorizontal: 13,
-          },
-        ]}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: dark ? c.glass : c.fill,
+          borderRadius: 22,
+          minHeight: 44,
+          paddingHorizontal: 14,
+          borderWidth: dark ? 0.5 : 0,
+          borderColor: c.glassBorder,
+          boxShadow: dark ? "0px 8px 24px rgba(0,0,0,0.18)" : undefined,
+        }}
       >
-        <Search size={18} color="#8B94A3" />
+        <Search size={17} color={c.secondary} />
         <TextInput
           accessibilityLabel="Search any location"
           value={query}
@@ -63,16 +59,10 @@ export default function PlaceSearch({
             setError("");
           }}
           placeholder="Search any location"
-          placeholderTextColor="#9098A5"
+          placeholderTextColor={c.tertiary}
           returnKeyType="search"
           onSubmitEditing={search}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            height: 49,
-            fontSize: 13,
-            color: colors.ink,
-          }}
+          style={{ flex: 1, minWidth: 0, height: 44, ...type.body, color: c.label }}
         />
         <Pressable
           accessibilityRole="button"
@@ -80,42 +70,43 @@ export default function PlaceSearch({
           onPress={search}
           hitSlop={10}
         >
-          {busy ? (
-            <ActivityIndicator color={colors.green} />
-          ) : (
-            <MapPin size={18} color={colors.green} />
-          )}
+          {busy ? <ActivityIndicator color={c.tint} /> : <MapPin size={18} color={c.tint} />}
         </Pressable>
       </View>
       {results.length > 0 && (
-        <View style={[ui.card, { padding: 7 }]}>
-          {results.map((result, i) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={result.name}
-              key={i}
-              onPress={() => {
-                onSelect(result);
-                setResults([]);
-                setQuery("");
-              }}
-              style={{
-                padding: 11,
-                borderBottomWidth: i === results.length - 1 ? 0 : 1,
-                borderColor: colors.line,
-              }}
-            >
-              <Text style={{ color: colors.ink, fontSize: 12, lineHeight: 18 }}>
-                {result.name}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <FadeIn>
+          <View style={[ui.card, { padding: 0, gap: 0, overflow: "hidden" }]}>
+            {results.map((result, i) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={result.name}
+                key={i}
+                onPress={() => {
+                  haptic.select();
+                  onSelect(result);
+                  setResults([]);
+                  setQuery("");
+                }}
+                style={({ pressed }) => ({
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  backgroundColor: pressed ? c.fill : "transparent",
+                  borderBottomWidth: i === results.length - 1 ? 0 : 0.5,
+                  borderColor: c.separator,
+                })}
+              >
+                <Text style={{ ...type.subhead, color: c.label }} numberOfLines={2}>
+                  {result.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </FadeIn>
       )}
       {!!error && (
         <Text
           accessibilityRole="alert"
-          style={[ui.small, { color: dark ? "#E8D7B0" : "#856432" }]}
+          style={{ ...type.footnote, color: dark ? "#FFE3A8" : c.gold, marginLeft: 8 }}
         >
           {error}
         </Text>

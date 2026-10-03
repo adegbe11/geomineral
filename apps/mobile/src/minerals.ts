@@ -420,6 +420,10 @@ export const minerals: Mineral[] = [
     "Ancient greenstone belts; major hosts of gold.", "gold", ["Serpentinite"]),
 ];
 
+const SUB = "₀₁₂₃₄₅₆₇₈₉";
+/** Chemical formula with subscript counts: FeS2 -> FeS₂, CaSO4·2H2O -> CaSO₄·2H₂O. */
+export const pretty = (formula: string) =>
+  formula.replace(/(?<=[A-Za-z)\]])\d+/g, (d) => [...d].map((x) => SUB[+x]).join(""));
 export const isRock = (x: Mineral) => !!x.rock;
 export const mineralSource = (x: Mineral) =>
   x.rock

@@ -1,9 +1,9 @@
-import MineralGuide from "./MineralGuide";
-import HomeScreen from "./HomeScreen";
 import { BlurView } from "expo-blur";
-import { useState, useEffect } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   BackHandler,
   Image,
   Modal,
@@ -17,26 +17,92 @@ import {
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Camera, Compass, Folder, Home, UserRound, X } from "lucide-react-native";
 import { Brand, Button, Header } from "./components/Primitives";
-import { WorkspaceProvider, useWorkspace } from "./state/Workspace";
-import { api, authenticate, post, signOut } from "./services/api";
-import { colors, ui } from "./theme";
-import type { Location, Project } from "./types";
+import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
+import HomeScreen from "./HomeScreen";
+import MineralGuide from "./MineralGuide";
+import { FadeIn, haptic, StackScreen, TabFade } from "./motion";
 import { Profile, ProjectDetail, ProjectsList } from "./ProjectScreens";
 import { Scanner } from "./ScanScreen";
-import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
+import { api, authenticate, post, signOut } from "./services/api";
+import { WorkspaceProvider, useWorkspace } from "./state/Workspace";
+import { type, useTheme } from "./theme";
+import type { Location, Project, Tab } from "./types";
+
+const native = Platform.OS !== "web";
+type Route =
+  | { name: "analysis" }
+  | { name: "report" }
+  | { name: "guide"; query: string }
+  | { name: "project" };
+const TABS = [
+  ["Home", Home],
+  ["Explore", Compass],
+  ["Scan", Camera],
+  ["Projects", Folder],
+  ["Profile", UserRound],
+] as const;
+
+/** Floating glass tab bar with a lens that slides to the selected tab. */
+function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const { c, dark } = useTheme();
+  const [width, setWidth] = useState(0);
+  const index = TABS.findIndex(([t]) => t === tab);
+  const x = useRef(new Animated.Value(index)).current;
+  useEffect(() => {
+    Animated.spring(x, { toValue: index, speed: 18, bounciness: 7, useNativeDriver: native }).start();
+  }, [index]);
+  const seg = width ? (width - 12) / TABS.length : 0;
+  return (
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={[styles.nav, { backgroundColor: c.glass, borderColor: c.glassBorder }]}
+    >
+      <BlurView intensity={70} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+      {!!seg && (
+        <Animated.View
+          style={{
+            position: "absolute",
+            top: 6,
+            bottom: 6,
+            left: 6,
+            width: seg,
+            borderRadius: 26,
+            backgroundColor: c.fill,
+            transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, seg] }) }],
+          }}
+        />
+      )}
+      {TABS.map(([name, Icon]) => {
+        const on = tab === name;
+        return (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={name}
+            key={name}
+            onPress={() => {
+              if (!on) haptic.select();
+              onChange(name);
+            }}
+            style={styles.navItem}
+          >
+            <Icon size={22} color={on ? c.tint : c.label} strokeWidth={on ? 2.4 : 1.8} />
+            <Text style={{ ...type.caption2, fontWeight: "600", color: on ? c.tint : c.label }}>
+              {name}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function Shell() {
   const w = useWorkspace();
-  const [guideQuery, setGuideQuery] = useState("");
-  const [guideOrigin, setGuideOrigin] = useState("");
-  function openGuide(query = "") {
-    setGuideQuery(query);
-    setGuideOrigin(route);
-    setRoute("guide");
-  }
-  const [route, setRoute] = useState(""),
+  const { c, ui, dark } = useTheme();
+  const [stack, setStack] = useState<Route[]>([]),
     [auth, setAuth] = useState(false),
     [register, setRegister] = useState(false),
     [email, setEmail] = useState(""),
@@ -47,14 +113,21 @@ function Shell() {
     [project, setProject] = useState<Project | null>(null),
     [name, setName] = useState(""),
     [saving, setSaving] = useState(false);
-  const back = () => {
-    setRoute("");
+  const top = stack[stack.length - 1];
+  const push = (r: Route) => setStack((s) => [...s, r]);
+  const pop = () => {
+    setStack((s) => s.slice(0, -1));
     setError("");
   };
+  const home = (tab?: Tab) => {
+    setStack([]);
+    if (tab) w.setTab(tab);
+  };
+  const openGuide = (query = "") => push({ name: "guide", query });
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (route) {
-        back();
+      if (stack.length) {
+        pop();
         return true;
       }
       if (w.tab !== "Home") {
@@ -64,7 +137,7 @@ function Shell() {
       return false;
     });
     return () => sub.remove();
-  }, [route, w.tab]);
+  }, [stack.length, w.tab]);
   useEffect(() => {
     if (w.user && w.tab === "Projects") {
       setBusy(true);
@@ -73,10 +146,10 @@ function Shell() {
         .catch((e) => setError(e.message))
         .finally(() => setBusy(false));
     } else if (!w.user) setProjects([]);
-  }, [w.user, w.tab, saving]);
+  }, [w.user, w.tab, saving, stack.length]);
   const analyze = (point?: Location) => {
     if (point) w.selectLocation(point);
-    setRoute("analysis");
+    if (top?.name !== "analysis") push({ name: "analysis" });
     void w.analyze(point);
   };
   const save = () => {
@@ -92,13 +165,13 @@ function Shell() {
     setBusy(true);
     setError("");
     try {
-      w.setUser(
-        await authenticate(register ? "register" : "login", email, password),
-      );
+      w.setUser(await authenticate(register ? "register" : "login", email, password));
       setAuth(false);
       setPassword("");
+      haptic.success();
       void w.welcome();
     } catch (e) {
+      haptic.warning();
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -116,21 +189,61 @@ function Shell() {
       });
       setProjects((old) => [p, ...old]);
       setSaving(false);
-      back();
-      w.setTab("Projects");
+      haptic.success();
+      home("Projects");
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  const dark =
-    !w.welcomed || (!route && (w.tab === "Explore" || w.tab === "Scan"));
+  const overDark = !w.welcomed || (!stack.length && (w.tab === "Explore" || w.tab === "Scan"));
+  const screen = (r: Route, back: () => void) => {
+    switch (r.name) {
+      case "analysis":
+        return (
+          <AnalysisScreen
+            back={back}
+            save={save}
+            report={() => push({ name: "report" })}
+            guide={openGuide}
+          />
+        );
+      case "report":
+        return <ReportScreen back={back} />;
+      case "guide":
+        return (
+          <MineralGuide
+            initialQuery={r.query}
+            back={back}
+            signIn={() => setAuth(true)}
+            explore={() => home("Explore")}
+          />
+        );
+      case "project":
+        return project ? (
+          <ProjectDetail
+            project={project}
+            setProject={setProject}
+            back={back}
+            guide={openGuide}
+            analyze={() => analyze(project.location)}
+            addSample={() => {
+              w.selectLocation(project.location);
+              home("Scan");
+            }}
+            deleted={() => {
+              setProjects((old) => old.filter((p) => p.id !== project.id));
+              setProject(null);
+              home();
+            }}
+          />
+        ) : null;
+    }
+  };
   return (
-    <SafeAreaView
-      style={[styles.frame, dark && { backgroundColor: colors.dark }]}
-    >
-      <StatusBar barStyle={dark ? "light-content" : "dark-content"} />
+    <SafeAreaView style={[styles.frame, { backgroundColor: overDark ? "#000" : c.bg }]}>
+      <StatusBar barStyle={overDark || dark ? "light-content" : "dark-content"} />
       {!w.ready ? (
         <View style={styles.center}>
           <Brand large light />
@@ -140,173 +253,112 @@ function Shell() {
         <View style={{ flex: 1, backgroundColor: "#031310" }}>
           <Image
             source={require("../assets/earth.jpg")}
-            style={{
-              position: "absolute",
-              top: 0,
-              width: "100%",
-              height: "65%",
-            }}
+            style={{ position: "absolute", top: 0, width: "100%", height: "68%" }}
             resizeMode="cover"
           />
           <LinearGradient
             colors={["transparent", "#041713", "#041713"]}
-            locations={[0, 0.68, 1]}
+            locations={[0, 0.66, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "flex-end",
-              padding: 30,
-              gap: 25,
-              paddingBottom: 35,
-            }}
-          >
-            <Brand large light />
-
-            <Button title="Get Started" onPress={() => void w.welcome()} />
-            <Pressable accessibilityRole="button" onPress={() => setAuth(true)}>
-              <Text style={{ color: "#fff", textAlign: "center", padding: 10 }}>
-                Sign In
+          <View style={{ flex: 1, justifyContent: "flex-end", padding: 24, gap: 14, paddingBottom: 30 }}>
+            <FadeIn delay={150}>
+              <Brand large light />
+            </FadeIn>
+            <FadeIn delay={300}>
+              <Text style={{ ...type.body, color: "rgba(255,255,255,0.7)", textAlign: "center", marginBottom: 18 }}>
+                Identify rocks. Read the ground.
               </Text>
-            </Pressable>
+            </FadeIn>
+            <FadeIn delay={450}>
+              <Button title="Get Started" onPress={() => void w.welcome()} />
+            </FadeIn>
+            <FadeIn delay={550}>
+              <Button plain title="Sign In" onPress={() => setAuth(true)} style={{ minHeight: 44 }} />
+            </FadeIn>
           </View>
         </View>
-      ) : route === "analysis" ? (
-        <AnalysisScreen
-          back={back}
-          save={save}
-          report={() => setRoute("report")}
-          guide={openGuide}
-        />
-      ) : route === "report" ? (
-        <ReportScreen back={() => setRoute("analysis")} />
-      ) : route === "guide" ? (
-        <MineralGuide
-          initialQuery={guideQuery}
-          back={() => setRoute(guideOrigin)}
-          signIn={() => setAuth(true)}
-          explore={() => {
-            setRoute("");
-            w.setTab("Explore");
-          }}
-        />
-      ) : route === "project" && project ? (
-        <ProjectDetail
-          project={project}
-          setProject={setProject}
-          back={back}
-          guide={openGuide}
-          analyze={() => analyze(project.location)}
-          deleted={() => {
-            setProjects((old) => old.filter((p) => p.id !== project.id));
-            setProject(null);
-            back();
-          }}
-        />
-      ) : w.tab === "Home" ? (
-        <HomeScreen
-          analyze={() => analyze()}
-          guide={openGuide}
-          openRecent={(id) => {
-            w.openRecent(id);
-            setRoute("analysis");
-          }}
-        />
-      ) : w.tab === "Explore" ? (
-        <Explore
-          analyze={() => analyze()}
-          save={save}
-          results={() => setRoute("analysis")}
-        />
-      ) : w.tab === "Scan" ? (
-        <Scanner signIn={() => setAuth(true)} guide={openGuide} />
-      ) : w.tab === "Projects" ? (
-        <ProjectsList
-          projects={projects}
-          busy={busy}
-          error={error}
-          signIn={() => setAuth(true)}
-          create={save}
-          open={async (p) => {
-            setError("");
-            try {
-              setProject(await api<Project>(`/projects/${p.id}`));
-              setRoute("project");
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
-        />
       ) : (
-        <Profile
-          error={error}
-          signIn={() => setAuth(true)}
-          signOut={async () => {
-            try {
-              await signOut();
-              w.clearPrivateState();
-              setProject(null);
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
-        />
-      )}
-      {w.welcomed && !route && (
-        <View style={styles.nav}>
-          <BlurView
-            intensity={65}
-            tint="light"
-            style={StyleSheet.absoluteFill}
-          />
-          {(
-            [
-              ["Home", Home],
-              ["Explore", Compass],
-              ["Scan", Camera],
-              ["Projects", Folder],
-              ["Profile", UserRound],
-            ] as const
-          ).map(([tab, Icon]) => (
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: w.tab === tab }}
-              accessibilityLabel={tab}
-              key={tab}
-              onPress={() => {
-                w.setTab(tab);
-                setError("");
-              }}
-              style={[
-                styles.navItem,
-                w.tab === tab && {
-                  backgroundColor: "#DDE8D4",
-                  borderRadius: 28,
-                },
-              ]}
-            >
-              <Icon
-                size={21}
-                color={w.tab === tab ? colors.green : "#7C8494"}
-                strokeWidth={w.tab === tab ? 2.4 : 1.6}
-              />
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: w.tab === tab ? colors.green : "#747D8C",
-                  fontWeight: w.tab === tab ? "700" : "400",
+        <View style={{ flex: 1 }}>
+          <View
+            style={{ flex: 1 }}
+            aria-hidden={stack.length > 0}
+            accessibilityElementsHidden={stack.length > 0}
+            importantForAccessibility={stack.length ? "no-hide-descendants" : "auto"}
+          >
+          <TabFade id={w.tab}>
+            {w.tab === "Home" ? (
+              <HomeScreen
+                analyze={() => analyze()}
+                guide={openGuide}
+                openRecent={(id) => {
+                  w.openRecent(id);
+                  push({ name: "analysis" });
                 }}
-              >
-                {tab}
-              </Text>
-            </Pressable>
+              />
+            ) : w.tab === "Explore" ? (
+              <Explore analyze={() => analyze()} save={save} results={() => push({ name: "analysis" })} />
+            ) : w.tab === "Scan" ? (
+              <Scanner signIn={() => setAuth(true)} guide={openGuide} />
+            ) : w.tab === "Projects" ? (
+              <ProjectsList
+                projects={projects}
+                busy={busy}
+                error={error}
+                signIn={() => setAuth(true)}
+                create={save}
+                open={async (p) => {
+                  setError("");
+                  try {
+                    setProject(await api<Project>(`/projects/${p.id}`));
+                    push({ name: "project" });
+                  } catch (e) {
+                    setError((e as Error).message);
+                  }
+                }}
+              />
+            ) : (
+              <Profile
+                error={error}
+                signIn={() => setAuth(true)}
+                signOut={async () => {
+                  try {
+                    await signOut();
+                    w.clearPrivateState();
+                    setProject(null);
+                  } catch (e) {
+                    setError((e as Error).message);
+                  }
+                }}
+              />
+            )}
+          </TabFade>
+          <TabBar
+            tab={w.tab}
+            onChange={(t) => {
+              w.setTab(t);
+              setError("");
+            }}
+          />
+          </View>
+          {stack.map((r, i) => (
+            <View
+              key={`${i}-${r.name}`}
+              style={StyleSheet.absoluteFill}
+              pointerEvents={i === stack.length - 1 ? "auto" : "none"}
+              aria-hidden={i !== stack.length - 1}
+              accessibilityElementsHidden={i !== stack.length - 1}
+              importantForAccessibility={i === stack.length - 1 ? "auto" : "no-hide-descendants"}
+            >
+              <StackScreen onBack={pop}>{(back) => screen(r, back)}</StackScreen>
+            </View>
           ))}
         </View>
       )}
       <Modal
         visible={auth || saving}
         animationType="slide"
+        presentationStyle={Platform.OS === "ios" ? "pageSheet" : undefined}
         onRequestClose={() => {
           setAuth(false);
           setSaving(false);
@@ -314,51 +366,54 @@ function Shell() {
       >
         <SafeAreaView style={ui.page}>
           <Header
-            title={
-              saving
-                ? "Save to My Projects"
-                : register
-                  ? "Create Account"
-                  : "Welcome Back"
-            }
+            title={saving ? "Save to Projects" : register ? "Create Account" : "Welcome Back"}
             right={
               <Pressable
                 accessibilityLabel="Close"
+                hitSlop={10}
                 onPress={() => {
                   setAuth(false);
                   setSaving(false);
                   setError("");
                 }}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: c.fill,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <X size={22} />
+                <X size={16} color={c.secondary} strokeWidth={2.6} />
               </Pressable>
             }
           />
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[
-              ui.content,
-              { width: "100%", maxWidth: 430, alignSelf: "center" },
-            ]}
+            contentContainerStyle={[ui.content, { width: "100%", maxWidth: 430, alignSelf: "center", gap: 14 }]}
           >
-            <Brand large />
-
+            <FadeIn style={{ paddingVertical: 18 }}>
+              <Brand large />
+            </FadeIn>
             {saving ? (
               <>
-                <Text style={ui.label}>Project name</Text>
                 <TextInput
                   accessibilityLabel="Project name"
+                  placeholder="Project name"
+                  placeholderTextColor={c.tertiary}
                   value={name}
                   onChangeText={setName}
                   style={ui.field}
                 />
-                <Text style={ui.body}>{w.location.name}</Text>
+                <Text style={[ui.small, { marginLeft: 4 }]}>{w.location.name}</Text>
               </>
             ) : (
               <>
                 <TextInput
                   accessibilityLabel="Email"
-                  placeholder="Email address"
+                  placeholder="Email"
+                  placeholderTextColor={c.tertiary}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
@@ -368,7 +423,8 @@ function Shell() {
                 />
                 <TextInput
                   accessibilityLabel="Password"
-                  placeholder="Password (at least 12 characters)"
+                  placeholder="Password (12+ characters)"
+                  placeholderTextColor={c.tertiary}
                   secureTextEntry
                   autoCapitalize="none"
                   value={password}
@@ -379,25 +435,15 @@ function Shell() {
             )}
             {!!error && <Text style={ui.error}>{error}</Text>}
             <Button
-              title={
-                saving
-                  ? "Save Project"
-                  : register
-                    ? "Create Account"
-                    : "Sign In"
-              }
+              title={saving ? "Save Project" : register ? "Create Account" : "Sign In"}
               busy={busy}
               disabled={saving ? !name.trim() : !email || !password}
               onPress={saving ? saveProject : login}
             />
             {!saving && (
               <Button
-                outline
-                title={
-                  register
-                    ? "Already have an account? Sign In"
-                    : "New here? Create Account"
-                }
+                plain
+                title={register ? "Already have an account? Sign In" : "New here? Create Account"}
                 onPress={() => {
                   setRegister(!register);
                   setError("");
@@ -410,6 +456,7 @@ function Shell() {
     </SafeAreaView>
   );
 }
+
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -421,35 +468,27 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
 const styles = StyleSheet.create({
-  outer: { flex: 1, backgroundColor: "#D5DDD5", alignItems: "center" },
+  outer: { flex: 1, backgroundColor: "#0E1512", alignItems: "center" },
   frame: {
     flex: 1,
     width: "100%",
     maxWidth: Platform.OS === "web" ? 430 : undefined,
-    backgroundColor: colors.bg,
     overflow: "hidden",
   },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 30 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 30, backgroundColor: "#041713" },
   nav: {
     position: "absolute",
-    bottom: 12,
-    left: 15,
-    right: 15,
+    bottom: 14,
+    left: 16,
+    right: 16,
     flexDirection: "row",
     padding: 6,
-    backgroundColor: "#F7FAF1CC",
-    borderRadius: 36,
-    borderWidth: 1,
-    borderColor: "#FFFFFFCC",
+    borderRadius: 32,
+    borderWidth: 0.5,
     overflow: "hidden",
-    boxShadow: "0px 5px 25px rgba(24,45,27,0.16)",
+    boxShadow: "0px 10px 30px rgba(0,0,0,0.18)",
   },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    minHeight: 54,
-  },
+  navItem: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2, minHeight: 52 },
 });
