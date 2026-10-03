@@ -1,6 +1,6 @@
 {
   "name": "@geomineral/mobile",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "main": "index.ts",
   "scripts": {
@@ -11,20 +11,23 @@
     "web": "expo start --web --port 8081"
   },
   "dependencies": {
-    "expo": "57.0.23",
+    "expo": "~57.0.26",
+    "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
     "expo-blur": "~57.0.3",
-    "expo-camera": "~57.0.5",
+    "expo-build-properties": "~57.0.22",
+    "expo-camera": "~57.0.6",
     "expo-file-system": "~57.0.7",
     "expo-haptics": "~57.0.3",
-    "expo-image-manipulator": "~57.0.18",
-    "expo-image-picker": "~57.0.18",
+    "expo-image-manipulator": "~57.0.20",
+    "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
-    "expo-location": "~57.0.18",
+    "expo-location": "~57.0.20",
     "expo-print": "~57.0.2",
     "expo-secure-store": "~57.0.4",
     "expo-sensors": "~57.0.3",
-    "expo-sharing": "~57.0.20",
+    "expo-sharing": "~57.0.22",
+    "expo-splash-screen": "~57.0.9",
     "jspdf": "^4.2.1",
     "lucide-react-native": "^0.577.0",
     "maplibre-gl": "^5.20.0",
@@ -39,5 +42,13 @@
   "devDependencies": {
     "@types/react": "^19.2.0",
     "typescript": "^5.9.3"
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript",
+        "@types/react"
+      ]
+    }
   }
 }

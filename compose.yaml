@@ -28,7 +28,10 @@ services:
       APP_ENV: production
       COOKIE_SECURE: "true"
       ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the HTTPS site origin}
-      PROVIDER_USER_AGENT: ${PROVIDER_USER_AGENT:-GeoMineral/0.1}
+      PROVIDER_USER_AGENT: ${PROVIDER_USER_AGENT:-GeoMineral/1.0}
+      # TLS reverse proxy + web proxy.
+      PROXY_HOPS: "2"
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
     depends_on:
       migrate: { condition: service_completed_successfully }
   worker:

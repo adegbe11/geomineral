@@ -432,3 +432,41 @@ def test_own_samples_join_the_analysis_privately(clients):
     assert "Lab-confirmed in your sample at the pin" in result["Lead"].explanation
     assert result["Tin"].prospectivity == "Insufficient evidence"
     assert "suspected tin (not confirmed)" in result["Tin"].explanation
+
+
+def test_rate_limit_uses_client_behind_proxies(monkeypatch):
+    from types import SimpleNamespace
+
+    from geomineral import config
+    from geomineral.main import client_ip
+
+    req = SimpleNamespace(
+        headers={"x-forwarded-for": "6.6.6.6, 203.0.113.9, 10.0.0.5"},
+        client=SimpleNamespace(host="10.0.0.7"),
+    )
+    monkeypatch.setattr(config, "PROXY_HOPS", 0)
+    assert client_ip(req) == "10.0.0.7"
+    monkeypatch.setattr(config, "PROXY_HOPS", 2)
+    assert client_ip(req) == "203.0.113.9"
+
+
+def test_stalled_source_is_cut_off(monkeypatch):
+    import asyncio
+
+    from geomineral import providers
+    from geomineral.schemas import Point
+
+    async def stall(self, client, location, radius_km):
+        await asyncio.sleep(30)
+
+    for cls in (
+        providers.MacrostratProvider,
+        providers.USGSOccurrenceProvider,
+        providers.LiteratureProvider,
+        providers.StructureProvider,
+    ):
+        monkeypatch.setattr(cls, "fetch", stall)
+    monkeypatch.setattr(providers, "PROVIDER_DEADLINE", 0.05)
+    monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
+    results = asyncio.run(providers.collect(Point(lat=0, lng=0), 5, set()))
+    assert {r.status for r in results} == {"unavailable"}

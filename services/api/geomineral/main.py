@@ -57,7 +57,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="GeoMineral API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="GeoMineral API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ORIGINS,
@@ -66,6 +66,14 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Guest-Token"],
 )
 requests: dict[str, deque] = defaultdict(deque)
+
+
+def client_ip(request: Request) -> str:
+    # Behind proxies, each hop appends the address it received from; count back to the client.
+    hops = request.headers.get("x-forwarded-for", "").split(",")
+    if config.PROXY_HOPS and len(hops) >= config.PROXY_HOPS:
+        return hops[-config.PROXY_HOPS].strip()
+    return request.client.host if request.client else "local"
 
 
 @app.middleware("http")
@@ -90,8 +98,11 @@ async def guard(request: Request, call_next):
                 return Response("Request too large", status_code=413)
             chunks.append(chunk)
         request._body = b"".join(chunks)
-        key = (request.client.host if request.client else "local") + request.url.path
+        key = client_ip(request) + request.url.path
         queue, instant = requests[key], time.monotonic()
+        if len(requests) > 10_000:
+            for k in [k for k, q in requests.items() if not q or q[-1] < instant - 60]:
+                del requests[k]
         while queue and queue[0] < instant - 60:
             queue.popleft()
         if len(queue) >= 20:
@@ -105,7 +116,7 @@ async def guard(request: Request, call_next):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "1.0.0"}
 
 
 @app.get("/api/scan/status")

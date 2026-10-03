@@ -269,6 +269,9 @@ class USGSOccurrenceProvider:
 COUNTRY_PROVIDERS: dict[str, list[GeologyProvider]] = {}
 
 
+PROVIDER_DEADLINE = 60
+
+
 async def collect(
     location: Point, radius_km: float, disabled: set[str], on_done=None
 ) -> list[ProviderResult]:
@@ -291,8 +294,11 @@ async def collect(
                     message="This provider is disabled. No evidence was retrieved.",
                 )
             try:
-                result = await provider.fetch(client, location, radius_km)
-            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+                # Per-read timeouts can't stop a slow trickle; cap each source overall.
+                result = await asyncio.wait_for(
+                    provider.fetch(client, location, radius_km), PROVIDER_DEADLINE
+                )
+            except (TimeoutError, httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 log.warning(
                     "provider_failed source=%s error=%s", provider.source.id, type(exc).__name__
                 )
