@@ -7,6 +7,7 @@ import OrbitingEarth from "./components/OrbitingEarth";
 import PlaceSearch from "./components/PlaceSearch";
 import { minerals, pretty } from "./minerals";
 import { FadeIn, Float, Pressy } from "./motion";
+import { SPECIES_COUNT } from "./species";
 import { useWorkspace } from "./state/Workspace";
 import { ratingColor, ratingLabel, type, useTheme } from "./theme";
 
@@ -170,7 +171,7 @@ export default function HomeScreen({
         <View style={[ui.card, { padding: 0, gap: 0, overflow: "hidden" }]}>
           <Row
             title="Mineral Guide"
-            detail={`${minerals.length}`}
+            detail={SPECIES_COUNT.toLocaleString()}
             onPress={() => guide()}
             icon={<BookOpen size={20} color={c.tint} />}
           />
