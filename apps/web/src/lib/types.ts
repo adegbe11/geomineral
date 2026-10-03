@@ -62,6 +62,8 @@ export type GeologyUnit = {
   age: string;
   color: string;
   reference: string;
+  top_ma?: number | null;
+  bottom_ma?: number | null;
 };
 export type Analysis = {
   location: Location;

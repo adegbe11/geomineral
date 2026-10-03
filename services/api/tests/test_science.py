@@ -247,3 +247,30 @@ async def test_provider_failure_is_isolated(monkeypatch):
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = await providers.collect(Point(lat=0, lng=0), 25, set())
     assert [r.status for r in results] == ["unavailable", "empty"]
+
+
+async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):
+    from geomineral import deeptime
+
+    deeptime._points.clear()
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.params["time"])
+        age = float(request.url.params["time"])
+        coords = [[999.99, 999.99]] if age > 250 else [[10.0 + age / 100, -5.0]]
+        return httpx.Response(200, json={"type": "MultiPoint", "coordinates": coords})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(
+        deeptime.httpx,
+        "AsyncClient",
+        lambda **kw: real(transport=httpx.MockTransport(handler), **kw),
+    )
+    first = await deeptime.positions(1.0, 2.0)
+    assert first[0] == {"age": 0, "lat": 1.0, "lng": 2.0}
+    assert first[deeptime.AGES.index(200)] == {"age": 200, "lat": -5.0, "lng": 12.0}
+    assert first[deeptime.AGES.index(500)] is None
+    count = len(calls)
+    assert await deeptime.positions(1.0, 2.0) == first
+    assert len(calls) == count

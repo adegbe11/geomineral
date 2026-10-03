@@ -19,6 +19,7 @@ import {
   PenLine,
   X,
 } from "lucide-react-native";
+import DeepTime from "./components/DeepTime";
 import NativeMap from "./components/NativeMap";
 import PlaceSearch from "./components/PlaceSearch";
 import { Button, Empty, Header, Row } from "./components/Primitives";
@@ -492,7 +493,7 @@ export function AnalysisScreen({
               <FadeIn delay={120}>
                 <Segmented
                   role="tab"
-                  items={["Minerals", "Sites", "Geology", "Sources"]}
+                  items={["Minerals", "Sites", "Geology", "Time", "Sources"]}
                   value={tab}
                   onChange={setTab}
                 />
@@ -570,6 +571,8 @@ export function AnalysisScreen({
                   ) : (
                     <Empty title="No recorded sites" description={`Within ${a.radius_km} km`} />
                   )
+                ) : tab === "Time" ? (
+                  <DeepTime location={a.location} units={a.geology_units} />
                 ) : tab === "Geology" ? (
                   <>
                     {!a.geology_units?.length && <Empty title="No mapped geology" description="" />}

@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 
-from . import config
+from . import config, deeptime
 from .auth import (
     current_user,
     hash_password,
@@ -230,6 +230,22 @@ async def search(q: str):
                 503,
                 "Place search is temporarily unavailable. Enter latitude, longitude or drop a pin on the map.",
             )
+
+
+@app.get("/api/deeptime")
+async def deep_time(lat: float, lng: float):
+    point = Point(lat=lat, lng=lng)
+    return {"ages": await deeptime.positions(point.lat, point.lng)}
+
+
+@app.get("/api/deeptime/coastlines")
+async def deep_time_coastlines(age: int):
+    if age not in deeptime.AGES:
+        raise HTTPException(422, "Unsupported age")
+    try:
+        return {"age": age, "rings": await deeptime.coastlines(age)}
+    except (httpx.HTTPError, ValueError, KeyError):
+        raise HTTPException(503, "Past maps are unavailable right now.")
 
 
 @app.get("/api/reverse")

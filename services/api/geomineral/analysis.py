@@ -189,6 +189,8 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
                 e.raw_value.get("best_int_name") or e.raw_value.get("t_int_name") or ""
             ).strip(),
             "color": str(e.raw_value.get("color") or ""),
+            "top_ma": e.raw_value.get("t_age"),
+            "bottom_ma": e.raw_value.get("b_age"),
             "reference": str(e.raw_value.get("publication") or ""),
         }
         for e in geology

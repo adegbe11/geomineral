@@ -372,3 +372,30 @@ test("samples saved offline sync when back online", async ({ page, context }) =>
   await page.getByRole("button", { name: "Cave survey" }).click();
   await expect(page.getByText("Galena field sample", { exact: true })).toBeVisible();
 });
+
+test("deep time moves the place through past plates", async ({ page }) => {
+  test.setTimeout(180000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  await page.getByLabel("Search any location", { exact: true }).fill("-30.7489, 121.4658");
+  await page.getByRole("button", { name: "Search places" }).click();
+  await page.getByRole("button", { name: "-30.74890, 121.46580" }).click();
+  await page.getByRole("button", { name: "Analyze Location" }).click();
+  await expect(page.getByRole("button", { name: "View Report" })).toBeVisible({ timeout: 120000 });
+  await page.getByRole("tab", { name: "Time", exact: true }).click();
+  await expect(page.getByText("This spot was at")).toBeVisible({ timeout: 60000 });
+  await expect(page.getByText("31°S", { exact: true })).toBeVisible();
+  const slider = page.getByRole("slider", { name: "Time" });
+  await slider.scrollIntoViewIfNeeded();
+  const box = (await slider.boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+  await expect(page.getByText("200 million years ago")).toBeVisible();
+  await expect(page.getByText("62°S", { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText("Temperate", { exact: true })).toBeVisible();
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: "test-results/deeptime.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
