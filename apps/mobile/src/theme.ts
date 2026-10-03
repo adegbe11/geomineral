@@ -77,3 +77,22 @@ export const ui = StyleSheet.create({
     alignSelf: "flex-start",
   },
 });
+
+// Screening ratings, strongest first.
+export const ratingColors: Record<string, string> = {
+  High: "#1F7A47",
+  Moderate: "#C08A1E",
+  Low: "#7D8F84",
+  "Insufficient evidence": "#A9B3AD",
+};
+export const ratingColor = (rating?: string) =>
+  ratingColors[rating ?? ""] ?? ratingColors["Insufficient evidence"];
+export const siteColor = (status: string) => {
+  const s = status.toLowerCase();
+  if (s === "producer") return "#E0A526";
+  if (s.includes("producer")) return "#D9663B";
+  if (s.includes("prospect")) return "#3D86C6";
+  return "#93A39A";
+};
+export const distance = (m: number) =>
+  m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;

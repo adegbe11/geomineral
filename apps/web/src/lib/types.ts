@@ -50,6 +50,18 @@ export type Assessment = {
   explanation: string;
   evidence_ids: string[];
   missing: string[];
+  score?: number;
+  site_count?: number;
+  nearest_km?: number | null;
+  producer_count?: number;
+  host_rocks?: string[];
+};
+export type GeologyUnit = {
+  name: string;
+  lith: string;
+  age: string;
+  color: string;
+  reference: string;
 };
 export type Analysis = {
   location: Location;
@@ -67,6 +79,8 @@ export type Analysis = {
   evidence: Evidence[];
   assessments: Assessment[];
   occurrences: Occurrence[];
+  geology_units?: GeologyUnit[];
+  rating?: string;
   summary: string;
   coverage: { name: string; status: string; detail: string }[];
   evidence_quality: string;

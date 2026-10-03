@@ -76,6 +76,7 @@ class Category(StrEnum):
     INSUFFICIENT = "Insufficient evidence"
     LOW = "Low"
     MODERATE = "Moderate"
+    HIGH = "High"
 
 
 class Assessment(BaseModel):
@@ -85,6 +86,11 @@ class Assessment(BaseModel):
     explanation: str
     evidence_ids: list[str]
     missing: list[str]
+    score: int = 0
+    site_count: int = 0
+    nearest_km: float | None = None
+    producer_count: int = 0
+    host_rocks: list[str] = Field(default_factory=list)
 
 
 class AnalysisRequest(BaseModel):

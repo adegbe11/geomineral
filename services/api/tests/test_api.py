@@ -269,3 +269,39 @@ def test_mobile_guest_header_isolation(clients):
     a.cookies.clear()
     assert a.get(f"/api/analyses/{run['id']}", headers=headers).status_code == 200
     assert b.get(f"/api/analyses/{run['id']}").status_code == 404
+
+
+def test_reverse_geocode_short_name_and_fallback(clients, monkeypatch):
+    import httpx
+    from geomineral import main
+
+    main.geocoder_cache.clear()
+    real = httpx.AsyncClient
+
+    def fake(payload, status=200):
+        transport = httpx.MockTransport(lambda r: httpx.Response(status, json=payload))
+        return lambda **kw: real(transport=transport, **kw)
+
+    monkeypatch.setattr(main, "last_geocode", 0.0)
+    monkeypatch.setattr(
+        main.httpx,
+        "AsyncClient",
+        fake(
+            {
+                "address": {
+                    "city": "Kalgoorlie",
+                    "state": "Western Australia",
+                    "country": "Australia",
+                    "country_code": "au",
+                }
+            }
+        ),
+    )
+    a, _, _ = clients
+    place = a.get("/api/reverse", params={"lat": -30.7489, "lng": 121.4658}).json()
+    assert place["name"] == "Kalgoorlie, Western Australia, Australia"
+    assert place["country_code"] == "AU"
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", fake({"error": "Unable to geocode"}))
+    ocean = a.get("/api/reverse", params={"lat": 0, "lng": -140}).json()
+    assert ocean["name"] == "0.00000, -140.00000"

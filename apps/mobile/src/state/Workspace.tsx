@@ -20,12 +20,16 @@ export const initialLocation: Location = {
   name: "Uhonmora, Edo State, Nigeria",
   country_code: "NG",
 };
+// Names that are only coordinates or placeholders get a reverse lookup.
+const UNNAMED =
+  /^(-?\d+(\.\d+)?, ?-?\d+(\.\d+)?|Selected map location|Current location)$/;
 function useWorkspaceState() {
   const [user, setUser] = useState<User | null>(null),
     [ready, setReady] = useState(false),
     [welcomed, setWelcomed] = useState(false),
     [tab, setTab] = useState<Tab>("Home"),
-    [professional, setProfessional] = useState(false);
+    [professional, setProfessional] = useState(false),
+    [radius, setRadius] = useState(25);
   const [location, setLocation] = useState<Location>(initialLocation),
     [polygon, setPolygon] = useState<number[][]>([]),
     [analysis, setAnalysis] = useState<Analysis | null>(null),
@@ -69,6 +73,19 @@ function useWorkspaceState() {
     setRunId("");
     setStatus("");
     setError("");
+    if (UNNAMED.test(point.name)) {
+      const version = generation.current;
+      api<Location>(`/reverse?lat=${point.lat}&lng=${point.lng}`)
+        .then((place) => {
+          if (generation.current === version && !UNNAMED.test(place.name))
+            setLocation((old) =>
+              old.lat === point.lat && old.lng === point.lng
+                ? { ...old, name: place.name, country_code: place.country_code }
+                : old,
+            );
+        })
+        .catch(() => {});
+    }
   }
   async function welcome() {
     setWelcomed(true);
@@ -83,7 +100,7 @@ function useWorkspaceState() {
       await ensureGuest();
       const run = await api<Run>("/analyses", {
         method: "POST",
-        body: JSON.stringify({ location, radius_km: 25 }),
+        body: JSON.stringify({ location, radius_km: radius }),
       });
       if (generation.current !== version) return;
       setRunId(run.id);
@@ -147,6 +164,8 @@ function useWorkspaceState() {
     setProfessional,
     location,
     selectLocation,
+    radius,
+    setRadius,
     polygon,
     setPolygon,
     analysis,

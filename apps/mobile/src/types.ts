@@ -7,6 +7,7 @@ export type {
   Source,
   Assessment,
   Occurrence,
+  GeologyUnit,
 } from "../../web/src/lib/types";
 export type Tab = "Home" | "Explore" | "Scan" | "Projects" | "Profile";
 import type {

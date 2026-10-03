@@ -229,6 +229,52 @@ async def search(q: str):
             )
 
 
+@app.get("/api/reverse")
+async def reverse(lat: float, lng: float):
+    """Short place name for a point; falls back to coordinates when unknown."""
+    global last_geocode
+    point = Point(lat=lat, lng=lng)
+    key = f"rev:{point.lat:.3f},{point.lng:.3f}"
+    if key in geocoder_cache and geocoder_cache[key][0] > time.monotonic() - 3600:
+        return geocoder_cache[key][1]
+    fallback = Point(lat=lat, lng=lng, name=f"{lat:.5f}, {lng:.5f}").model_dump()
+    async with geocoder_lock:
+        await asyncio.sleep(max(0, 1.1 - (time.monotonic() - last_geocode)))
+        last_geocode = time.monotonic()
+        try:
+            async with httpx.AsyncClient(
+                timeout=8, headers={"User-Agent": config.USER_AGENT}
+            ) as client:
+                result = await client.get(
+                    os.getenv(
+                        "REVERSE_GEOCODER_URL", "https://nominatim.openstreetmap.org/reverse"
+                    ),
+                    params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 10},
+                )
+                result.raise_for_status()
+                row = result.json()
+        except (httpx.HTTPError, ValueError):
+            return fallback
+    address = row.get("address", {}) if isinstance(row, dict) else {}
+    parts = [
+        address.get(k)
+        for k in ("city", "town", "village", "municipality", "county", "state", "country")
+        if address.get(k)
+    ]
+    if not parts:
+        return fallback
+    place = Point(
+        lat=lat,
+        lng=lng,
+        name=", ".join(dict.fromkeys(parts[:3]))[:250],
+        country_code=(address.get("country_code") or "").upper()[:3] or None,
+    ).model_dump()
+    if len(geocoder_cache) >= 500:
+        geocoder_cache.clear()
+    geocoder_cache[key] = (time.monotonic(), place)
+    return place
+
+
 def accessible_run(run: AnalysisRun | None, user: User | None, request: Request):
     guest = request.headers.get("x-guest-token") or request.cookies.get("gm_guest", "")
     if not run or not (

@@ -57,9 +57,9 @@ test("coordinate search reaches live analysis and report", async ({ page }) => {
     page.getByText("Location Analysis", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "View Full Report" }),
+    page.getByRole("button", { name: "View Report" }),
   ).toBeVisible({ timeout: 120000 });
-  await page.getByRole("button", { name: "View Full Report" }).click();
+  await page.getByRole("button", { name: "View Report" }).click();
   await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PDF" }).click();
@@ -193,4 +193,49 @@ test("native account saves a private project", async ({ page }) => {
   await page.getByRole("tab", { name: "Profile", exact: true }).click();
   await page.getByRole("button", { name: "Sign Out", exact: true }).click();
   await expect(page.getByText("Guest", { exact: true })).toBeVisible();
+});
+
+test("mining district shows rating, sites on the map and a full report", async ({
+  page,
+}) => {
+  test.setTimeout(180000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  await page
+    .getByLabel("Search any location", { exact: true })
+    .fill("-30.7489, 121.4658");
+  await page.getByRole("button", { name: "Search places" }).click();
+  await page.getByRole("button", { name: "-30.74890, 121.46580" }).click();
+  await page.getByRole("button", { name: "Street", exact: true }).click();
+  await page.getByRole("button", { name: "Satellite", exact: true }).click();
+  await page.getByRole("button", { name: "50 km radius" }).click();
+  await page.getByRole("button", { name: "25 km radius" }).click();
+  await page.getByRole("button", { name: "Analyze Location" }).click();
+  await expect(page.getByRole("button", { name: "View Report" })).toBeVisible({
+    timeout: 120000,
+  });
+  await expect(page.getByText("High", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Gold", { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/analysis.png", fullPage: true });
+  await page.getByRole("tab", { name: "Sites", exact: true }).click();
+  await expect(page.getByText(/Producer · .*Gold/).first()).toBeVisible();
+  await page.getByRole("tab", { name: "Geology", exact: true }).click();
+  await expect(page.getByText(/greenstone/).first()).toBeVisible();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await expect(page.getByText(/sites · 25 km/)).toBeVisible();
+  await page.screenshot({ path: "test-results/explore.png" });
+  await page.getByText(/sites · 25 km/).click();
+  await page.getByRole("button", { name: "View Report" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const download = await downloadPromise;
+  await download.saveAs("test-results/Kalgoorlie-Report.pdf");
+  const { readFile } = await import("node:fs/promises");
+  const bytes = await readFile("test-results/Kalgoorlie-Report.pdf");
+  expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(bytes.length).toBeGreaterThan(8000);
+  expect(errors).toEqual([]);
 });

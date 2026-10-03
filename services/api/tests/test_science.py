@@ -10,7 +10,7 @@ def test_no_evidence_means_no_candidates():
     assert assess([]) == []
 
 
-def test_regional_gold_does_not_imply_local_prospectivity():
+def test_one_distant_record_is_only_low():
     evidence = Evidence(
         id="test",
         source_id="fixture",
@@ -21,8 +21,8 @@ def test_regional_gold_does_not_imply_local_prospectivity():
         direction="positive",
     )
     result = assess([evidence])[0]
-    assert result.prospectivity == "Insufficient evidence"
-    assert result.evidence_quality == "Very Limited"
+    assert result.prospectivity == "Low"
+    assert result.site_count == 1
 
 
 def test_specific_host_and_contradiction_are_distinct():
@@ -45,6 +45,65 @@ def test_specific_host_and_contradiction_are_distinct():
         description="Synthetic contradiction",
     )
     assert assess([host, negative])[0].prospectivity == "Insufficient evidence"
+
+
+def _site(dep, commodity, km, stat="Occurrence"):
+    return Evidence(
+        id=f"mrds:{dep}:{commodity}",
+        source_id="usgs-mrds",
+        feature_id=dep,
+        evidence_type="regional_occurrence",
+        commodity=commodity,
+        direction="positive",
+        description="Synthetic site",
+        distance_m=km * 1000,
+        raw_value={"dev_stat": stat},
+    )
+
+
+def test_greenstone_with_gold_mines_is_high_and_ranked_first():
+    rock = Evidence(
+        id="rock",
+        source_id="macrostrat",
+        feature_id="1",
+        evidence_type="mapped_geology",
+        description="Synthetic greenstone",
+        raw_value={"lith": "greenstone belt; mafic-ultramafic volcanic rocks"},
+    )
+    sites = [_site(str(i), "Gold", 3 + i, "Past Producer") for i in range(4)]
+    result = assess([rock, *sites, _site("x", "Silver", 20)])
+    assert result[0].commodity == "Gold"
+    assert result[0].prospectivity == "High"
+    assert result[0].site_count == 4
+    assert result[0].nearest_km == 3.0
+    assert result[0].host_rocks == ["greenstone"]
+    nickel = next(a for a in result if a.commodity == "Nickel")
+    assert nickel.prospectivity == "Low"
+
+
+def test_same_site_counted_once():
+    result = assess([_site("1", "Gold", 2), _site("1", "Gold", 2)])[0]
+    assert result.site_count == 1
+    assert result.prospectivity == "Moderate"
+
+
+def test_summary_names_best_signal_and_site_count():
+    from geomineral.providers import MRDS
+
+    result = build_analysis(
+        AnalysisRequest(location=Point(lat=0, lng=0)),
+        [
+            ProviderResult(
+                source=MRDS,
+                status="available",
+                evidence=[_site("1", "Gold", 2)],
+                occurrences=[{"id": "1", "distance_m": 2000}],
+            )
+        ],
+    )
+    assert result["rating"] == "Moderate"
+    assert "Best signal: Gold (Moderate)" in result["summary"]
+    assert "1 recorded mineral sites within 25 km" in result["summary"]
 
 
 def test_generic_sedimentary_rock_does_not_become_limestone():
@@ -143,6 +202,27 @@ async def test_upstream_error_does_not_become_absence():
     ) as client:
         with pytest.raises(ValueError):
             await USGSOccurrenceProvider().fetch(client, Point(lat=0, lng=0), 25)
+
+
+async def test_occurrences_fall_back_to_wfs_when_arcgis_is_down():
+    gml = b"""<wfs:FeatureCollection xmlns:ms="http://mapserver.gis.umn.edu/mapserver"
+      xmlns:gml="http://www.opengis.net/gml" xmlns:wfs="http://www.opengis.net/wfs">
+      <gml:featureMember><ms:mrds><ms:geometry><gml:Point><gml:pos>0.0 0.01</gml:pos></gml:Point></ms:geometry>
+      <ms:dep_id>w1</ms:dep_id><ms:site_name>Fixture WFS mine</ms:site_name>
+      <ms:dev_stat>Producer</ms:dev_stat><ms:code_list> AU </ms:code_list></ms:mrds></gml:featureMember>
+    </wfs:FeatureCollection>"""
+
+    def handler(request):
+        if "arcgis" in str(request.url):
+            return httpx.Response(503, text="The service is unavailable.")
+        return httpx.Response(200, content=gml)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await USGSOccurrenceProvider().fetch(client, Point(lat=0, lng=0), 25)
+    assert result.status == "available"
+    assert result.occurrences[0]["name"] == "Fixture WFS mine"
+    assert result.occurrences[0]["commodities"] == ["Gold"]
+    assert 1000 < result.occurrences[0]["distance_m"] < 1200
 
 
 async def test_unconfigured_rock_provider_never_returns_a_guess():

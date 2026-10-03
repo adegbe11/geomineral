@@ -1,78 +1,178 @@
-"""Conservative, versioned screening rules; not a calibrated resource model."""
+"""Transparent, versioned screening rules; not a calibrated resource model."""
 
 import hashlib
 import json
+import re
 
 from .schemas import AnalysisRequest, Assessment, Category, Evidence, ProviderResult, now
 
-MODEL_VERSION = "screening-0.1.0"
+MODEL_VERSION = "screening-0.2.0"
 MISSING = [
     "No verified local assay results",
     "No drilling evidence",
     "No verified local structural or alteration model",
 ]
-# These are candidate-generation rules only, not a universal deposit score.
-COMMODITY_RULES = {
-    "Limestone": {
-        "terms": ["limestone"],
-        "reason": "A source maps limestone, which warrants checking its composition and suitability locally.",
+# "direct": the mapped rock is itself the commodity. "host": the rock commonly hosts it.
+# Terms are matched against a map unit's lithology and name only.
+ROCK_RULES = [
+    {"commodities": ["Limestone"], "terms": ["limestone"], "kind": "direct"},
+    {"commodities": ["Gypsum"], "terms": ["gypsum", "evaporite"], "kind": "direct"},
+    {"commodities": ["Clay"], "terms": ["claystone"], "kind": "direct"},
+    {"commodities": ["Kaolin"], "terms": ["kaolin"], "kind": "direct"},
+    {"commodities": ["Marble"], "terms": ["marble"], "kind": "direct"},
+    {"commodities": ["Salt"], "terms": ["halite", "rock salt"], "kind": "direct"},
+    {"commodities": ["Aluminium"], "terms": ["bauxite"], "kind": "direct"},
+    {
+        "commodities": ["Iron"],
+        "terms": ["banded iron", "iron formation", "ironstone"],
+        "kind": "direct",
     },
-    "Gypsum": {
-        "terms": ["gypsum"],
-        "reason": "A source explicitly describes gypsum-bearing material; extent and quality remain unverified.",
+    {"commodities": ["Graphite"], "terms": ["graphite", "graphitic"], "kind": "direct"},
+    {"commodities": ["Phosphate"], "terms": ["phosphorite"], "kind": "direct"},
+    {
+        "commodities": ["Gold"],
+        "terms": ["greenstone", "metavolcanic", "quartz vein", "turbidite"],
+        "kind": "host",
     },
-    "Clay": {
-        "terms": ["claystone"],
-        "reason": "A mapped clay-rich rock may justify characterization; industrial suitability is unknown.",
+    {
+        "commodities": ["Nickel", "Cobalt", "Chromium"],
+        "terms": ["ultramafic", "peridotite", "dunite", "serpentinite", "komatiite"],
+        "kind": "host",
     },
-}
+    {"commodities": ["Copper"], "terms": ["porphyry", "granodiorite", "andesite"], "kind": "host"},
+    {"commodities": ["Lithium", "Tin", "Tantalum"], "terms": ["pegmatite"], "kind": "host"},
+    {"commodities": ["Tin", "Tungsten"], "terms": ["greisen"], "kind": "host"},
+    {"commodities": ["Rare earth elements", "Niobium"], "terms": ["carbonatite"], "kind": "host"},
+    {"commodities": ["Diamond"], "terms": ["kimberlite", "lamproite"], "kind": "host"},
+    {"commodities": ["Aluminium"], "terms": ["laterite"], "kind": "host"},
+]
+RANK = {Category.HIGH: 3, Category.MODERATE: 2, Category.LOW: 1, Category.INSUFFICIENT: 0}
+NEAR_KM = 5
+
+
+def _rock_text(e: Evidence) -> str:
+    return f"{e.raw_value.get('lith') or ''} {e.raw_value.get('name') or ''}".lower()
+
+
+def _rock_matches(geology: list[Evidence]) -> dict[str, dict]:
+    """commodity -> {"kind": strongest kind, "terms": matched terms, "ids": evidence ids}."""
+    found: dict[str, dict] = {}
+    for rule in ROCK_RULES:
+        for e in geology:
+            text = _rock_text(e)
+            terms = [t for t in rule["terms"] if t in text]
+            if not terms:
+                continue
+            for commodity in rule["commodities"]:
+                hit = found.setdefault(commodity, {"kind": rule["kind"], "terms": [], "ids": []})
+                if rule["kind"] == "direct":
+                    hit["kind"] = "direct"
+                hit["terms"] += [t for t in terms if t not in hit["terms"]]
+                if e.id not in hit["ids"]:
+                    hit["ids"].append(e.id)
+    return found
+
+
+def _km(m: float) -> str:
+    return f"{m / 1000:.1f} km"
 
 
 def assess(evidence: list[Evidence]) -> list[Assessment]:
-    candidates = {e.commodity for e in evidence if e.commodity}
     geology = [e for e in evidence if e.evidence_type == "mapped_geology"]
-    for commodity, rule in COMMODITY_RULES.items():
-        if any(
-            any(term in str(e.raw_value.get("lith", "")).lower() for term in rule["terms"])
-            for e in geology
-        ):
-            candidates.add(commodity)
+    rocks = _rock_matches(geology)
+    candidates = {e.commodity for e in evidence if e.commodity} | set(rocks)
     results = []
-    for commodity in sorted(candidates):
+    for commodity in candidates:
         related = [e for e in evidence if e.commodity == commodity]
-        rule = COMMODITY_RULES.get(commodity)
-        host = [
-            e
-            for e in geology
-            if rule
-            and any(term in str(e.raw_value.get("lith", "")).lower() for term in rule["terms"])
+        sites = {}
+        for e in related:
+            if e.evidence_type == "regional_occurrence":
+                sites.setdefault(e.feature_id, e)
+        nearest = min(
+            (e.distance_m for e in sites.values() if e.distance_m is not None), default=None
+        )
+        producers = [
+            e for e in sites.values() if "producer" in str(e.raw_value.get("dev_stat", "")).lower()
         ]
         negative = [e for e in related if e.direction == "negative"]
-        # Regional occurrences alone cannot justify a local prospectivity category.
-        category = Category.MODERATE if host and not negative else Category.INSUFFICIENT
-        explanation = (
-            rule["reason"]
-            if host and rule
-            else "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location."
-        )
+        rock = rocks.get(commodity)
+
+        score = 0
+        if rock:
+            score += 2 if rock["kind"] == "direct" else 1
+        if sites:
+            score += 1
+        if len(sites) >= 3:
+            score += 1
+        if nearest is not None and nearest <= NEAR_KM * 1000:
+            score += 1
+        if producers:
+            score += 1
         if negative:
-            explanation += " Contradictory evidence is present and requires professional review."
+            category = Category.INSUFFICIENT
+        elif score >= 4:
+            category = Category.HIGH
+        elif score >= 2:
+            category = Category.MODERATE
+        elif score == 1:
+            category = Category.LOW
+        else:
+            category = Category.INSUFFICIENT
+
+        parts = []
+        if sites:
+            noun = "site" if len(sites) == 1 else "sites"
+            line = f"{len(sites)} recorded {commodity.lower()} {noun} nearby"
+            if nearest is not None:
+                line += f", the closest {_km(nearest)} away"
+            parts.append(line + ".")
+            if producers:
+                parts.append(
+                    f"{len(producers)} {'was a producing mine' if len(producers) == 1 else 'were producing mines'}."
+                )
+        if rock:
+            rocks_text = ", ".join(rock["terms"])
+            parts.append(
+                f"Mapped {rocks_text} here is a direct source of {commodity.lower()}."
+                if rock["kind"] == "direct"
+                else f"Mapped {rocks_text} here commonly hosts {commodity.lower()}."
+            )
+        if negative:
+            parts.append("Contradictory evidence is present and needs professional review.")
+
+        if rock and len(sites) >= 3:
+            quality = "Good"
+        elif rock or sites:
+            quality = "Limited"
+        else:
+            quality = "Very Limited"
         results.append(
             Assessment(
                 commodity=commodity,
                 prospectivity=category,
-                evidence_quality="Limited" if host else "Very Limited",
-                explanation=explanation,
-                evidence_ids=[e.id for e in related + host],
+                evidence_quality=quality,
+                explanation=" ".join(parts) or "Reported in a connected source.",
+                evidence_ids=[e.id for e in related] + (rock["ids"] if rock else []),
                 missing=MISSING,
+                score=score,
+                site_count=len(sites),
+                nearest_km=round(nearest / 1000, 1) if nearest is not None else None,
+                producer_count=len(producers),
+                host_rocks=rock["terms"] if rock else [],
             )
         )
-    return results
+    return sorted(
+        results, key=lambda a: (-RANK[a.prospectivity], -a.score, -a.site_count, a.commodity)
+    )
 
 
 def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) -> dict:
     evidence = [e for provider in providers for e in provider.evidence]
     geology = [e for e in evidence if e.evidence_type == "mapped_geology"]
+    occurrences = sorted(
+        [o for p in providers for o in p.occurrences], key=lambda o: o["distance_m"]
+    )
+    assessments = assess(evidence)
     snapshots = [provider.model_dump() for provider in providers]
     fingerprint = hashlib.sha256(
         json.dumps(
@@ -80,6 +180,47 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
             sort_keys=True,
         ).encode()
     ).hexdigest()
+    units = [
+        {
+            "name": re.sub(r"\s+\d+$", "", str(e.raw_value.get("name") or "").strip())
+            or "Unnamed unit",
+            "lith": str(e.raw_value.get("lith") or "").strip(),
+            "age": str(
+                e.raw_value.get("best_int_name") or e.raw_value.get("t_int_name") or ""
+            ).strip(),
+            "color": str(e.raw_value.get("color") or ""),
+            "reference": str(e.raw_value.get("publication") or ""),
+        }
+        for e in geology
+    ]
+    units = list({(u["name"], u["lith"]): u for u in units}.values())
+    rated = [a for a in assessments if a.prospectivity != Category.INSUFFICIENT]
+    if geology or occurrences:
+        lines = []
+        if rated:
+            top = rated[0]
+            lines.append(f"Best signal: {top.commodity} ({top.prospectivity}).")
+        sites_checked = any(
+            p.source.provider_type == "occurrences" and p.status in ("available", "empty")
+            for p in providers
+        )
+        if occurrences:
+            lines.append(
+                f"{len(occurrences)} recorded mineral sites within {request.radius_km:g} km."
+            )
+        elif sites_checked:
+            lines.append(f"No recorded mineral sites within {request.radius_km:g} km.")
+        else:
+            lines.append("Mine records are unavailable right now.")
+        if units:
+            lines.append(
+                "Mapped rocks: "
+                + "; ".join(dict.fromkeys((u["lith"] or u["name"])[:60] for u in units[:3]))
+                + "."
+            )
+        summary = " ".join(lines)
+    else:
+        summary = "Detailed geological information is currently unavailable from our connected sources for this location. There is insufficient evidence to assess local mineral potential."
     return {
         "location": request.location.model_dump(),
         "radius_km": request.radius_km,
@@ -89,19 +230,11 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
         "evidence_fingerprint": fingerprint,
         "providers": snapshots,
         "evidence": [e.model_dump() for e in evidence],
-        "assessments": [a.model_dump() for a in assess(evidence)],
-        "occurrences": sorted(
-            [o for p in providers for o in p.occurrences], key=lambda o: o["distance_m"]
-        ),
-        "summary": (
-            "Connected maps report: "
-            + "; ".join(
-                dict.fromkeys(str(e.raw_value.get("name", "Unnamed unit")) for e in geology)
-            )
-            + ". These map units describe regional geology, not confirmed mineral deposits."
-        )
-        if geology
-        else "Detailed geological information is currently unavailable from our connected sources for this location. There is insufficient evidence to assess local mineral potential.",
+        "assessments": [a.model_dump() for a in assessments],
+        "occurrences": occurrences,
+        "geology_units": units,
+        "rating": rated[0].prospectivity if rated else Category.INSUFFICIENT,
+        "summary": summary,
         "coverage": [
             {"name": p.source.dataset_name, "status": p.status, "detail": p.message}
             for p in providers
@@ -112,7 +245,7 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
         ],
         "evidence_quality": "Limited" if geology else "Very Limited",
         "limitations": [
-            "A prospectivity assessment is not proof of a mineral deposit.",
+            "A screening rating is not proof of a mineral deposit.",
             "Regional map scale and historical records limit local conclusions.",
             "No inference about grade, tonnage, economic viability, land access or mineral rights is made.",
             "Missing records are not evidence of mineral absence.",

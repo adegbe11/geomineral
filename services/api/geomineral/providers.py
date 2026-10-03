@@ -2,8 +2,10 @@
 
 import asyncio
 import logging
+import math
 import re
 from typing import Protocol
+from xml.etree import ElementTree
 
 import httpx
 
@@ -37,6 +39,9 @@ MRDS = Source(
     notes="Historical compilation. Records may be incomplete or outdated; a mine record does not establish current activity.",
 )
 SOURCES = [MACROSTRAT, MRDS]
+WFS_URL = "https://mrdata.usgs.gov/services/wfs/mrds"
+MS_NS = "http://mapserver.gis.umn.edu/mapserver"
+GML_NS = "http://www.opengis.net/gml"
 COMMODITY_CODES = {
     "AU": "Gold",
     "AG": "Silver",
@@ -56,6 +61,32 @@ COMMODITY_CODES = {
     "GYP": "Gypsum",
     "AL": "Aluminium",
     "DIA": "Diamond",
+    "PB": "Lead",
+    "ZN": "Zinc",
+    "MO": "Molybdenum",
+    "W": "Tungsten",
+    "MN": "Manganese",
+    "CR": "Chromium",
+    "PT": "Platinum",
+    "PGE": "Platinum",
+    "V": "Vanadium",
+    "TI": "Titanium",
+    "BE": "Beryllium",
+    "NB": "Niobium",
+    "SB": "Antimony",
+    "BI": "Bismuth",
+    "HG": "Mercury",
+    "ZR": "Zirconium",
+    "FLR": "Fluorite",
+    "BRT": "Barite",
+    "PHO": "Phosphate",
+    "SLT": "Salt",
+    "TLC": "Talc",
+    "MCA": "Mica",
+    "FLD": "Feldspar",
+    "SIL": "Silica",
+    "MRB": "Marble",
+    "GEM": "Gemstones",
 }
 
 
@@ -108,6 +139,15 @@ class USGSOccurrenceProvider:
     source = MRDS
 
     async def fetch(self, client, location, radius_km):
+        try:
+            features, truncated = await self._arcgis(client, location, radius_km)
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            # The ArcGIS mirror is often down; the WFS service carries the same records.
+            log.info("mrds_arcgis_failed error=%s; using WFS", type(exc).__name__)
+            features, truncated = await self._wfs(client, location, radius_km)
+        return self._build(features, truncated, location, radius_km)
+
+    async def _arcgis(self, client, location, radius_km):
         response = await client.get(
             self.source.api_url,
             params={
@@ -130,12 +170,56 @@ class USGSOccurrenceProvider:
         payload = response.json()
         if "error" in payload:
             raise ValueError("Occurrence service rejected the query")
-        evidence, occurrences = [], []
-        for feature in payload["features"]:
-            row, geom = feature["attributes"], feature.get("geometry")
-            if not geom:
+        features = [
+            (f["attributes"], f["geometry"]["x"], f["geometry"]["y"])
+            for f in payload["features"]
+            if f.get("geometry")
+        ]
+        return features, bool(payload.get("exceededTransferLimit"))
+
+    async def _wfs(self, client, location, radius_km):
+        dlat = radius_km / 111.0
+        dlng = radius_km / max(111.0 * math.cos(math.radians(location.lat)), 1.0)
+        bbox = (
+            max(location.lat - dlat, -90),
+            max(location.lng - dlng, -180),
+            min(location.lat + dlat, 90),
+            min(location.lng + dlng, 180),
+        )
+        response = await client.get(
+            WFS_URL,
+            params={
+                "service": "WFS",
+                "version": "1.1.0",
+                "request": "GetFeature",
+                "typeName": "mrds",
+                "bbox": ",".join(f"{v:.5f}" for v in bbox) + ",EPSG:4326",
+                "maxFeatures": 400,
+            },
+        )
+        response.raise_for_status()
+        try:
+            root = ElementTree.fromstring(response.content)
+        except ElementTree.ParseError as exc:
+            raise ValueError("Occurrence service returned unreadable data") from exc
+        features = []
+        for node in root.iter(f"{{{MS_NS}}}mrds"):
+            pos = node.find(f".//{{{GML_NS}}}pos")
+            if pos is None or not pos.text:
                 continue
-            distance = distance_m((location.lng, location.lat), (geom["x"], geom["y"]))
+            lat, lng = (float(v) for v in pos.text.split()[:2])
+            row = {
+                key: (node.findtext(f"{{{MS_NS}}}{key}") or "").strip() or None
+                for key in ("dep_id", "site_name", "dev_stat", "code_list", "url")
+            }
+            if row["dep_id"]:
+                features.append((row, lng, lat))
+        return features, len(features) >= 400
+
+    def _build(self, features, truncated, location, radius_km):
+        evidence, occurrences = [], []
+        for row, x, y in features:
+            distance = distance_m((location.lng, location.lat), (x, y))
             if distance > radius_km * 1000:
                 continue
             codes = re.findall(r"[A-Z]+", (row.get("code_list") or "").upper())
@@ -146,8 +230,8 @@ class USGSOccurrenceProvider:
                 "status": row.get("dev_stat") or "Unknown",
                 "commodities": commodities,
                 "distance_m": round(distance),
-                "lat": geom["y"],
-                "lng": geom["x"],
+                "lat": y,
+                "lng": x,
                 "source_id": self.source.id,
                 "url": f"https://mrdata.usgs.gov/mrds/show-mrds.php?dep_id={row['dep_id']}",
                 "raw": row,
@@ -163,7 +247,7 @@ class USGSOccurrenceProvider:
                         commodity=commodity,
                         direction="positive",
                         description=f"{commodity} is reported at {occurrence['name']}, {distance / 1000:.1f} km from the selected point. This does not establish mineralization at the point.",
-                        distance_m=distance,
+                        distance_m=round(distance),
                         raw_value=row,
                     )
                 )
@@ -174,7 +258,7 @@ class USGSOccurrenceProvider:
             evidence=evidence,
             occurrences=occurrences,
             message="Results limited to 250 records; search a smaller radius for dense districts."
-            if payload.get("exceededTransferLimit")
+            if truncated
             else "Historical occurrence records; no inference of current mine activity.",
         )
 

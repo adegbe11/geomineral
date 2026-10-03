@@ -42,7 +42,8 @@ import { WorkspaceProvider, useWorkspace } from "./state/Workspace";
 import { api, authenticate, coordinates, post, signOut } from "./services/api";
 import { colors, ui } from "./theme";
 import type { Project } from "./types";
-import { Explore, Scanner, AnalysisScreen, ReportScreen } from "./screens";
+import { Scanner } from "./screens";
+import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
 function Shell() {
   const w = useWorkspace();
   const [guideQuery, setGuideQuery] = useState("");
@@ -267,7 +268,11 @@ function Shell() {
       ) : w.tab === "Home" ? (
         <HomeScreen analyze={analyze} guide={openGuide} />
       ) : w.tab === "Explore" ? (
-        <Explore analyze={analyze} save={save} />
+        <Explore
+          analyze={analyze}
+          save={save}
+          results={() => setRoute("analysis")}
+        />
       ) : w.tab === "Scan" ? (
         <Scanner signIn={() => setAuth(true)} />
       ) : w.tab === "Projects" ? (
