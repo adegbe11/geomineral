@@ -48,8 +48,28 @@ const TABS = [
 ] as const;
 
 /** Floating glass tab bar with a lens that slides to the selected tab. */
-function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
-  const { c, dark } = useTheme();
+function TabBar({
+  tab,
+  onChange,
+  onDark,
+}: {
+  tab: Tab;
+  onChange: (t: Tab) => void;
+  /** Dark glass over the planet, map and camera. */
+  onDark?: boolean;
+}) {
+  const theme = useTheme();
+  const dark = theme.dark || !!onDark;
+  const c = onDark
+    ? {
+        ...theme.c,
+        glass: "rgba(22,26,24,0.6)",
+        glassBorder: "rgba(255,255,255,0.14)",
+        fill: "rgba(255,255,255,0.14)",
+        label: "#FFFFFF",
+        tint: "#5FD39A",
+      }
+    : theme.c;
   const [width, setWidth] = useState(0);
   const index = TABS.findIndex(([t]) => t === tab);
   const x = useRef(new Animated.Value(index)).current;
@@ -201,7 +221,8 @@ function Shell() {
       setBusy(false);
     }
   }
-  const overDark = !w.welcomed || (!stack.length && (w.tab === "Explore" || w.tab === "Scan"));
+  const overDark =
+    !w.welcomed || (!stack.length && (w.tab === "Home" || w.tab === "Explore" || w.tab === "Scan"));
   const screen = (r: Route, back: () => void) => {
     switch (r.name) {
       case "analysis":
@@ -249,7 +270,15 @@ function Shell() {
     }
   };
   return (
-    <SafeAreaView style={[styles.frame, { backgroundColor: overDark ? "#000" : c.bg }]}>
+    <SafeAreaView
+      style={[
+        styles.frame,
+        {
+          backgroundColor:
+            !stack.length && w.welcomed && w.tab === "Home" ? "#06150F" : overDark ? "#000" : c.bg,
+        },
+      ]}
+    >
       <StatusBar barStyle={overDark || dark ? "light-content" : "dark-content"} />
       {!w.ready ? (
         <View style={styles.center}>
@@ -343,6 +372,7 @@ function Shell() {
             )}
           </TabFade>
           <TabBar
+            onDark={w.tab === "Home" || w.tab === "Explore" || w.tab === "Scan"}
             tab={w.tab}
             onChange={(t) => {
               w.setTab(t);

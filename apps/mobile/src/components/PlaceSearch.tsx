@@ -9,16 +9,37 @@ import { type, useTheme } from "../theme";
 export default function PlaceSearch({
   onSelect,
   dark,
+  tone,
+  current,
 }: {
   onSelect: (location: Location) => void;
   /** Glass style for use over a map. */
   dark?: boolean;
+  /** Fixed light-on-dark style for glass cards on the Home planet. */
+  tone?: "glass";
+  /** The selected place, shown inside the field until the user types. */
+  current?: string;
 }) {
-  const { c, ui } = useTheme();
+  const theme = useTheme();
+  const { ui } = theme;
+  const c =
+    tone === "glass"
+      ? {
+          ...theme.c,
+          label: "#FFFFFF",
+          secondary: "rgba(255,255,255,0.8)",
+          tertiary: "rgba(255,255,255,0.6)",
+          fill: "rgba(0,0,0,0.24)",
+          tint: "#5FD39A",
+          gold: "#F4CF7A",
+        }
+      : theme.c;
+  const [focused, setFocused] = useState(false);
   const [query, setQuery] = useState(""),
     [results, setResults] = useState<Location[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const showCurrent = !!current && !focused && !query;
   async function search() {
     if (!query.trim()) return;
     setBusy(true);
@@ -49,7 +70,7 @@ export default function PlaceSearch({
           boxShadow: dark ? "0px 8px 24px rgba(0,0,0,0.18)" : undefined,
         }}
       >
-        <Search size={17} color={c.secondary} />
+        {showCurrent ? <MapPin size={17} color={c.tint} /> : <Search size={17} color={c.secondary} />}
         <TextInput
           accessibilityLabel="Search any location"
           value={query}
@@ -58,8 +79,10 @@ export default function PlaceSearch({
             setResults([]);
             setError("");
           }}
-          placeholder="Search any location"
-          placeholderTextColor={c.tertiary}
+          placeholder={showCurrent ? current : "Search any location"}
+          placeholderTextColor={showCurrent ? c.label : c.tertiary}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           returnKeyType="search"
           onSubmitEditing={search}
           style={{ flex: 1, minWidth: 0, height: 44, ...type.body, color: c.label }}
@@ -70,12 +93,24 @@ export default function PlaceSearch({
           onPress={search}
           hitSlop={10}
         >
-          {busy ? <ActivityIndicator color={c.tint} /> : <MapPin size={18} color={c.tint} />}
+          {busy ? (
+            <ActivityIndicator color={c.tint} />
+          ) : showCurrent ? (
+            <Search size={17} color={c.secondary} />
+          ) : (
+            <MapPin size={18} color={c.tint} />
+          )}
         </Pressable>
       </View>
       {results.length > 0 && (
         <FadeIn>
-          <View style={[ui.card, { padding: 0, gap: 0, overflow: "hidden" }]}>
+          <View
+            style={[
+              ui.card,
+              { padding: 0, gap: 0, overflow: "hidden" },
+              tone === "glass" && { backgroundColor: "#12352BF2", boxShadow: "none" },
+            ]}
+          >
             {results.map((result, i) => (
               <Pressable
                 accessibilityRole="button"

@@ -45,6 +45,7 @@ export function Button({
         {
           minHeight: 50,
           borderRadius: 25,
+          borderCurve: "continuous",
           flexDirection: "row",
           justifyContent: "center",
           alignItems: "center",
