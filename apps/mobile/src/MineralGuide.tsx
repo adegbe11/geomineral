@@ -7,17 +7,33 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Button, Header, MineralArt, Notice } from "./components/Primitives";
+import { ChevronRight, MapPin } from "lucide-react-native";
+import { Button, Empty, Header } from "./components/Primitives";
+import MineralArt from "./components/MineralArt";
+import { RatingPill } from "./ExploreScreens";
 import {
+  findMineral,
+  GROUPS,
   minerals,
   mineralSource,
   searchMinerals,
+  sourceName,
   type Mineral,
 } from "./minerals";
 import { useWorkspace } from "./state/Workspace";
-import { api, post, coordinates } from "./services/api";
+import { api, post } from "./services/api";
 import { colors, ui } from "./theme";
 import type { Project } from "./types";
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ flex: 1, gap: 3 }}>
+      <Text style={ui.small}>{label}</Text>
+      <Text style={[ui.h3, { fontSize: 14 }]}>{value}</Text>
+    </View>
+  );
+}
+
 export default function MineralGuide({
   back,
   initialQuery = "",
@@ -30,27 +46,24 @@ export default function MineralGuide({
   explore: () => void;
 }) {
   const w = useWorkspace();
-  const [query, setQuery] = useState(initialQuery),
+  const exact = findMineral(initialQuery);
+  const [query, setQuery] = useState(exact ? "" : initialQuery),
     [group, setGroup] = useState("All"),
-    [selected, setSelected] = useState<Mineral | null>(
-      minerals.find(
-        (m) => m.name.toLowerCase() === initialQuery.toLowerCase(),
-      ) || null,
-    ),
+    [selected, setSelected] = useState<Mineral | null>(exact ?? null),
     [projects, setProjects] = useState<Project[] | null>(null),
-    [title, setTitle] = useState(""),
+    [title, setTitle] = useState(exact ? `${exact.name} field sample` : ""),
     [notes, setNotes] = useState(""),
     [confirmed, setConfirmed] = useState(false),
     [reference, setReference] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [saved, setSaved] = useState(false);
-  function choose(m: Mineral) {
-    setSelected(m);
+  function choose(x: Mineral) {
+    setSelected(x);
     setProjects(null);
     setError("");
     setSaved(false);
-    setTitle(`${m.name} field sample`);
+    setTitle(`${x.name} field sample`);
     setNotes("");
     setConfirmed(false);
     setReference("");
@@ -62,7 +75,6 @@ export default function MineralGuide({
     }
     setBusy(true);
     setError("");
-    if (!title) setTitle(`${selected?.name} field sample`);
     try {
       setProjects(await api<Project[]>("/projects"));
     } catch (e) {
@@ -95,11 +107,14 @@ export default function MineralGuide({
       setBusy(false);
     }
   }
-  const related = selected
-    ? w.analysis?.assessments.filter(
-        (a) => a.commodity.toLowerCase() === selected.commodity,
+  const nearby = selected?.commodity
+    ? w.analysis?.assessments.find(
+        (a) =>
+          a.commodity.toLowerCase() === selected.commodity.toLowerCase() &&
+          a.prospectivity !== "Insufficient evidence",
       )
-    : [];
+    : undefined;
+  const results = searchMinerals(query, group);
   return (
     <>
       <Header
@@ -116,25 +131,26 @@ export default function MineralGuide({
       >
         {!selected ? (
           <>
-            <Text style={ui.body}>{minerals.length} minerals</Text>
             <TextInput
               accessibilityLabel="Search minerals"
-              placeholder="Name, formula or mineral group"
+              placeholder={`Search ${minerals.length} minerals and rocks`}
+              placeholderTextColor="#9098A5"
               value={query}
               onChangeText={setQuery}
               style={ui.field}
             />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={ui.row}>
-                {["All", ...new Set(minerals.map((m) => m.group))].map((g) => (
+              <View style={[ui.row, { gap: 8 }]}>
+                {GROUPS.map((g) => (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ selected: group === g }}
                     key={g}
                     onPress={() => setGroup(g)}
                     style={{
-                      padding: 12,
-                      borderRadius: 22,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 20,
                       backgroundColor: group === g ? colors.green : "#E4EADF",
                     }}
                   >
@@ -142,6 +158,7 @@ export default function MineralGuide({
                       style={{
                         color: group === g ? "#fff" : colors.ink,
                         fontSize: 12,
+                        fontWeight: "600",
                       }}
                     >
                       {g}
@@ -150,73 +167,153 @@ export default function MineralGuide({
                 ))}
               </View>
             </ScrollView>
-            {searchMinerals(query, group).map((m) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${m.name} profile`}
-                key={m.name}
-                onPress={() => choose(m)}
-                style={[ui.card, ui.row]}
-              >
-                <MineralArt color={m.color} />
-                <View style={{ flex: 1, gap: 6 }}>
-                  <Text style={ui.h2}>{m.name}</Text>
-                  <Text style={ui.small}>
-                    {m.formula} / {m.group}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              {results.map((x) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${x.name} profile`}
+                  key={x.name}
+                  onPress={() => choose(x)}
+                  style={({ pressed }) => [
+                    ui.card,
+                    {
+                      width: "47.5%",
+                      padding: 14,
+                      gap: 6,
+                      transform: [{ scale: pressed ? 0.97 : 1 }],
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      alignItems: "center",
+                      paddingVertical: 8,
+                      borderRadius: 16,
+                      backgroundColor: x.color + "1A",
+                    }}
+                  >
+                    <MineralArt color={x.color} habit={x.habit} size={64} />
+                  </View>
+                  <Text style={ui.h3} numberOfLines={1}>
+                    {x.name}
                   </Text>
-                </View>
-                <Text style={{ color: colors.green }}>→</Text>
-              </Pressable>
-            ))}
-            {!searchMinerals(query, group).length && (
-              <Notice>No matches.</Notice>
-            )}
+                  <Text style={ui.small} numberOfLines={1}>
+                    {x.rock ? x.group.replace(" rocks", "") : x.formula}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {!results.length && <Empty title="No matches" description="" />}
           </>
         ) : (
           <>
-            <View style={[ui.card, { alignItems: "center", padding: 30 }]}>
-              <MineralArt color={selected.color} size={110} />
+            <View
+              style={[
+                ui.card,
+                {
+                  alignItems: "center",
+                  padding: 28,
+                  backgroundColor: selected.color + "14",
+                  borderColor: selected.color + "33",
+                },
+              ]}
+            >
+              <MineralArt color={selected.color} habit={selected.habit} size={130} />
               <Text style={ui.title}>{selected.name}</Text>
               <Text style={ui.body}>
-                {selected.formula} / {selected.group}
+                {selected.rock ? selected.group : `${selected.formula} · ${selected.group}`}
               </Text>
-              <Text style={ui.small}>Mohs hardness: {selected.hardness}</Text>
+              {!selected.rock && (
+                <Text style={ui.small}>Mohs hardness: {selected.hardness}</Text>
+              )}
             </View>
-            <Text style={ui.h2}>Recognition clues</Text>
-            <Text style={ui.body}>{selected.traits}</Text>
-            <Text style={ui.h2}>Geological setting</Text>
-            <Text style={ui.body}>{selected.setting}</Text>
-            <Button
-              outline
-              title="Source"
+            {!selected.rock && (
+              <View style={[ui.card, ui.row, { alignItems: "flex-start" }]}>
+                <Fact label="Streak" value={selected.streak} />
+                <Fact label="Lustre" value={selected.luster} />
+              </View>
+            )}
+            <View style={{ gap: 8 }}>
+              <Text style={ui.h2}>Recognition clues</Text>
+              <Text style={ui.body}>{selected.traits}</Text>
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text style={ui.h2}>Where it forms</Text>
+              <Text style={ui.body}>{selected.setting}</Text>
+            </View>
+            {!!selected.lookalikes?.length && (
+              <View style={{ gap: 10 }}>
+                <Text style={ui.h2}>Look-alikes</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {selected.lookalikes.map((name) => {
+                    const other = findMineral(name);
+                    return (
+                      <Pressable
+                        key={name}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Compare with ${name}`}
+                        disabled={!other}
+                        onPress={() => other && choose(other)}
+                        style={[
+                          ui.row,
+                          {
+                            gap: 6,
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 18,
+                            backgroundColor: "#fff",
+                            borderWidth: 1,
+                            borderColor: colors.line,
+                          },
+                        ]}
+                      >
+                        {other && (
+                          <MineralArt color={other.color} habit={other.habit} size={20} />
+                        )}
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ink }}>
+                          {name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+            {nearby && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={explore}
+                style={[ui.card, ui.between]}
+              >
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={[ui.row, { gap: 6 }]}>
+                    <MapPin size={14} color={colors.green} />
+                    <Text style={ui.small} numberOfLines={1}>
+                      {w.location.name}
+                    </Text>
+                  </View>
+                  <RatingPill rating={nearby.prospectivity} />
+                  <Text style={ui.body}>{nearby.explanation}</Text>
+                </View>
+                <ChevronRight size={18} color={colors.muted} />
+              </Pressable>
+            )}
+            <Pressable
+              accessibilityRole="link"
               onPress={() =>
                 void Linking.openURL(mineralSource(selected)).catch(() =>
                   setError("Could not open the source."),
                 )
               }
-            />
-            <Text style={ui.small}>
-              Handbook of Mineralogy · Illustrated profiles
-            </Text>
-            <Text style={ui.h2}>Location</Text>
-            <Text style={ui.body}>
-              {w.location.name} / {coordinates(w.location)}
-            </Text>
-            {related?.length ? (
-              related.map((a) => (
-                <Notice key={a.commodity}>
-                  {a.commodity}: {a.prospectivity}. {a.explanation} This
-                  commodity-level assessment does not confirm this mineral
-                  species.
-                </Notice>
-              ))
-            ) : (
-              <Notice>No local evidence available.</Notice>
-            )}
-            <Button outline title="View on Map" onPress={explore} />
-            <Notice>Identification unconfirmed.</Notice>
+              style={[ui.card, ui.between]}
+            >
+              <Text style={ui.h3}>{sourceName(selected)}</Text>
+              <ChevronRight size={18} color={colors.muted} />
+            </Pressable>
             {saved ? (
-              <Notice>Saved.</Notice>
+              <Text style={[ui.h3, { color: colors.green, textAlign: "center" }]}>
+                Saved.
+              </Text>
             ) : (
               <Button title="Add Sample" busy={busy} onPress={prepare} />
             )}
@@ -232,6 +329,7 @@ export default function MineralGuide({
                 <TextInput
                   accessibilityLabel="Mineral sample notes"
                   placeholder="Notes"
+                  placeholderTextColor="#9098A5"
                   value={notes}
                   onChangeText={setNotes}
                   multiline
@@ -245,32 +343,36 @@ export default function MineralGuide({
                       onPress={() => setConfirmed(i === 1)}
                       key={v}
                       style={{
-                        padding: 12,
+                        paddingVertical: 10,
+                        paddingHorizontal: 14,
                         borderRadius: 18,
                         backgroundColor:
-                          confirmed === (i === 1) ? colors.pale : "#F5F5F5",
+                          confirmed === (i === 1) ? colors.green : "#EEF1EC",
                       }}
                     >
-                      <Text>{v}</Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "600",
+                          color: confirmed === (i === 1) ? "#fff" : colors.ink,
+                        }}
+                      >
+                        {v}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
                 {confirmed && (
-                  <Text style={ui.small}>
-                    User-reported. Lab reference required.
-                  </Text>
-                )}
-                {confirmed && (
                   <TextInput
                     accessibilityLabel="Laboratory reference"
-                    placeholder="Lab name and report/sample reference (required)"
+                    placeholder="Lab name and report reference"
+                    placeholderTextColor="#9098A5"
                     value={reference}
                     onChangeText={setReference}
                     style={ui.field}
                   />
                 )}
-
-                {!projects.length && <Notice>No projects yet.</Notice>}
+                {!projects.length && <Text style={ui.body}>No projects yet.</Text>}
                 {projects.map((p) => (
                   <Button
                     key={p.id}

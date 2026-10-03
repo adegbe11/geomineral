@@ -239,3 +239,24 @@ test("mining district shows rating, sites on the map and a full report", async (
   expect(bytes.length).toBeGreaterThan(8000);
   expect(errors).toEqual([]);
 });
+
+test("mineral guide covers rocks and links look-alikes", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("button", { name: "Mineral Guide", exact: true }).click();
+  await page.screenshot({ path: "test-results/guide.png" });
+  await page.getByRole("button", { name: "Rocks", exact: true }).click();
+  await page.getByRole("button", { name: "Open Granite profile" }).click();
+  await expect(page.getByText("Where it forms", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Compare with Diorite" }).click();
+  await expect(page.getByText("Diorite", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page.getByLabel("Search minerals").fill("fool's gold");
+  await page.getByRole("button", { name: "Open Pyrite profile" }).click();
+  await expect(page.getByText("Greenish-black", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/guide-pyrite.png", fullPage: true });
+  expect(errors).toEqual([]);
+});

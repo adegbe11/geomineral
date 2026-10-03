@@ -13,6 +13,11 @@ import {
 } from "lucide-react-native";
 import Svg, { Path, Circle } from "react-native-svg";
 import { Brand, Button, MineralArt } from "./components/Primitives";
+import { minerals } from "./minerals";
+
+const FEATURED = ["Gold", "Pyrite", "Quartz", "Malachite", "Amethyst", "Galena"].map(
+  (name) => minerals.find((x) => x.name === name)!,
+);
 import PlaceSearch from "./components/PlaceSearch";
 import { useWorkspace } from "./state/Workspace";
 import { colors, ui } from "./theme";
@@ -139,7 +144,7 @@ export default function HomeScreen({
                 transform: [{ rotate: "-18deg" }],
               }}
             >
-              <MineralArt color="#797D64" size={115} />
+              <MineralArt color="#797D64" habit="point" size={115} />
             </View>
             <View style={ui.between}>
               <View style={[s.toolIcon, { backgroundColor: "#FFFFFF88" }]}>
@@ -200,11 +205,7 @@ export default function HomeScreen({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 12, paddingBottom: 7 }}
         >
-          {[
-            ["Gold", "Au", "#C99D32", "Native element"],
-            ["Copper", "Cu", "#B97046", "Native element"],
-            ["Quartz", "SiO₂", "#AABBB8", "Silicate mineral"],
-          ].map(([name, symbol, color, category]) => (
+          {FEATURED.map(({ name, formula: symbol, color, habit, group: category }) => (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Learn about ${name}`}
@@ -217,7 +218,7 @@ export default function HomeScreen({
                 <ArrowUpRight size={14} color="#9CA79E" />
               </View>
               <View style={{ alignItems: "center", paddingVertical: 12 }}>
-                <MineralArt color={color} size={80} />
+                <MineralArt color={color} habit={habit} size={80} />
               </View>
               <Text
                 style={{ fontSize: 16, fontWeight: "600", color: colors.ink }}

@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { ArrowLeft, ArrowRight, Info } from "lucide-react-native";
-import Svg, { Path, Polygon } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
 import { colors, ui } from "../theme";
 export function Button({
   title,
@@ -155,28 +155,7 @@ export function Notice({ children }: { children: ReactNode }) {
     </View>
   );
 }
-export function MineralArt({
-  color,
-  size = 52,
-}: {
-  color: string;
-  size?: number;
-}) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Polygon points="10,22 26,6 47,13 59,39 46,58 17,54 5,38" fill={color} />
-      <Polygon points="26,6 29,29 10,22" fill="#FFFFFF55" />
-      <Polygon points="29,29 47,13 59,39" fill="#00000030" />
-      <Polygon points="29,29 17,54 5,38" fill="#00000022" />
-      <Polygon points="29,29 46,58 59,39" fill="#FFFFFF35" />
-      <Path
-        d="m16 23 10-10m6 25 9-11m-17 20 8-5"
-        stroke="#ffffff66"
-        strokeWidth={2}
-      />
-    </Svg>
-  );
-}
+export { default as MineralArt } from "./MineralArt";
 export function Empty({
   title,
   description,
