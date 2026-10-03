@@ -392,3 +392,43 @@ def test_voice_note_is_stored_and_validated(clients):
     detail = a.get(f"/api/projects/{project['id']}").json()
     assert detail["records"][0]["audio"] == audio
     assert "audio" not in a.get("/api/records").json()[0]
+
+
+def test_own_samples_join_the_analysis_privately(clients):
+    from geomineral.analysis import assess
+    from geomineral.samples import nearby_samples
+    from geomineral.schemas import Point
+
+    a, b, factory = clients
+    owner = register(a, "field@example.test")
+    register(b, "other-field@example.test")
+
+    def add(client, title, rock, method, lat=1.0, lng=2.0):
+        p = client.post(
+            "/api/projects", json={"name": title, "location": {"lat": lat, "lng": lng}}
+        ).json()
+        client.post(
+            f"/api/projects/{p['id']}/records",
+            json={
+                "kind": "sample",
+                "title": title,
+                "description": "Synthetic",
+                "rock_type": rock,
+                "method": method,
+                "location": {"lat": lat, "lng": lng},
+            },
+        )
+
+    add(a, "UHO-001", "Galena", "Lab-confirmed (user reported)")
+    add(a, "UHO-002", "Cassiterite", "Suspected visual identification")
+    add(a, "FAR-001", "Gold", "Lab-confirmed (user reported)", lat=20.0)
+    add(b, "NOT-MINE", "Gold", "Lab-confirmed (user reported)")
+    with factory() as db:
+        found = nearby_samples(db, owner["id"], Point(lat=1.0, lng=2.0), 25)
+    names = {e.raw_value["title"] for e in found}
+    assert names == {"UHO-001", "UHO-002"}
+    result = {x.commodity: x for x in assess(found)}
+    assert result["Lead"].prospectivity == "Moderate"
+    assert "Lab-confirmed in your sample at the pin" in result["Lead"].explanation
+    assert result["Tin"].prospectivity == "Insufficient evidence"
+    assert "suspected tin (not confirmed)" in result["Tin"].explanation

@@ -476,3 +476,36 @@ test("potential zones show a heatmap with named targets", async ({ page }) => {
   await page.screenshot({ path: "test-results/zones.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("a lab-confirmed sample feeds the next analysis", async ({ page }) => {
+  test.setTimeout(200000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.getByRole("button", { name: "New here? Create Account" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(`loop-${Date.now()}@example.test`);
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-native-test-only-passphrase");
+  await page.getByRole("button", { name: "Create Account", exact: true }).click();
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  await page.getByLabel("Project name", { exact: true }).fill("Loop field");
+  await page.getByRole("button", { name: "Use My Location" }).click();
+  await page.getByRole("button", { name: "Save Project", exact: true }).click();
+  await page.getByRole("tab", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Mineral Guide", exact: true }).click();
+  await page.getByLabel("Search minerals").fill("galena");
+  await page.getByRole("button", { name: "Open Galena profile" }).click();
+  await page.getByRole("button", { name: "Add Sample" }).click();
+  await page.getByRole("button", { name: "Lab-confirmed", exact: true }).click();
+  await page.getByLabel("Laboratory reference").fill("SGS report 4471");
+  await page.getByRole("button", { name: "Save to Loop field" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Loop field" }).click();
+  await page.getByRole("button", { name: "Analyze", exact: true }).click();
+  await expect(page.getByRole("button", { name: "View Report" })).toBeVisible({ timeout: 120000 });
+  await expect(page.getByText("Lab-confirmed", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/Lab-confirmed in your sample at the pin/)).toBeVisible();
+});

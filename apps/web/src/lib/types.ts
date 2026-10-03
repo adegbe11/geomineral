@@ -56,6 +56,7 @@ export type Assessment = {
   producer_count?: number;
   host_rocks?: string[];
   papers?: { title: string; year: number | null; url: string; studied: boolean }[];
+  samples?: { title: string; rock_type: string; confirmed: boolean; distance_km: number; project: string }[];
 };
 export type GeologyUnit = {
   name: string;

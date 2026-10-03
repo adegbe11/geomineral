@@ -11,6 +11,7 @@ from .analysis import build_analysis
 from .config import PRODUCTION
 from .db import AnalysisRun, Base, DatasetState, SessionLocal, engine, upgrade_local
 from .providers import collect
+from .samples import nearby_samples
 from .schemas import AnalysisRequest
 
 log = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ async def process_one() -> bool:
         if not claimed.rowcount:
             return True
         run_id, request = run.id, AnalysisRequest.model_validate_json(run.request_json)
+        owner = run.user_id
         disabled = {
             s.id for s in db.scalars(select(DatasetState).where(DatasetState.enabled.is_(False)))
         }
@@ -58,7 +60,11 @@ async def process_one() -> bool:
 
     try:
         providers = await collect(request.location, request.radius_km, disabled, report)
-        result = build_analysis(request, providers)
+        samples = []
+        if owner:
+            with SessionLocal() as db:
+                samples = nearby_samples(db, owner, request.location, request.radius_km)
+        result = build_analysis(request, providers, samples)
         with SessionLocal() as db:
             db.execute(
                 update(AnalysisRun)

@@ -93,6 +93,7 @@ class Assessment(BaseModel):
     producer_count: int = 0
     host_rocks: list[str] = Field(default_factory=list)
     papers: list[dict] = Field(default_factory=list)
+    samples: list[dict] = Field(default_factory=list)
 
 
 class AnalysisRequest(BaseModel):

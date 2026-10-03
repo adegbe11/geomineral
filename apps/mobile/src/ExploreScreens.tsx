@@ -391,6 +391,24 @@ function MineralRow({ m, guide }: { m: Assessment; guide: (q: string) => void })
           <RatingPill rating={m.prospectivity} />
         </View>
         <Text style={ui.body}>{m.explanation}</Text>
+        {!!m.samples?.length && (
+          <View style={{ gap: 6, marginTop: 2 }}>
+            <Text style={ui.caption}>Your samples</Text>
+            {m.samples.slice(0, 3).map((x) => (
+              <View
+                key={`${x.project}-${x.title}`}
+                style={[ui.row, { gap: 8, padding: 10, borderRadius: 12, backgroundColor: c.fill }]}
+              >
+                <Text style={[ui.badge, !x.confirmed && { color: c.secondary, backgroundColor: c.fillStrong }]}>
+                  {x.confirmed ? "Lab-confirmed" : "Suspected"}
+                </Text>
+                <Text style={[ui.small, { flex: 1, color: c.label }]} numberOfLines={1}>
+                  {x.title} · {x.rock_type} · {x.distance_km} km
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
         {!!m.papers?.length && (
           <View style={{ gap: 6, marginTop: 2 }}>
             <Text style={ui.caption}>Research</Text>

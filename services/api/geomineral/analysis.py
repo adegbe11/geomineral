@@ -133,12 +133,18 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
         # Studies naming the mineral in title/abstract count fully; full-text mentions alone
         # can only lift a mineral to "possible".
         studied = [e for e in papers if e.raw_value.get("studied")]
+        mine = [e for e in related if e.evidence_type == "field_sample"]
+        confirmed = [e for e in mine if e.raw_value.get("confirmed")]
+        suspected = [e for e in mine if not e.raw_value.get("confirmed")]
         if studied:
             score += 1
         if len(studied) >= 2:
             score += 1
         if papers and not studied and score == 0:
             score = 1
+        # A laboratory result from the user's own sample is the strongest local evidence.
+        if confirmed:
+            score += 2
         # A nearby fault strengthens existing evidence; it never creates a candidate alone.
         fault_near = bool(
             score and commodity in STRUCTURAL and fault and fault.raw_value["nearest_km"] <= NEAR_KM
@@ -187,6 +193,19 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                     f"Mentioned in {mentions} {'more ' if studied else ''}"
                     f"{'paper' if mentions == 1 else 'papers'} about {place}."
                 )
+        if confirmed:
+            closest = min(e.raw_value["distance_km"] for e in confirmed)
+            where = "at the pin" if closest < 0.1 else f"{closest:.1f} km away"
+            parts.append(
+                f"Lab-confirmed in your sample {where}."
+                if len(confirmed) == 1
+                else f"Lab-confirmed in {len(confirmed)} of your samples, the closest {where}."
+            )
+        if suspected:
+            parts.append(
+                f"{len(suspected)} of your {'sample was' if len(suspected) == 1 else 'samples were'} "
+                f"suspected {commodity.lower()} (not confirmed)."
+            )
         if fault_near:
             parts.append(
                 f"A mapped fault {fault.raw_value['nearest_km']:.1f} km away could have channelled "
@@ -195,7 +214,7 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
         if negative:
             parts.append("Contradictory evidence is present and needs professional review.")
 
-        families = sum(bool(x) for x in (rock, sites, studied))
+        families = sum(bool(x) for x in (rock, sites, studied, confirmed))
         if families >= 2 and (len(sites) >= 3 or len(studied) >= 2):
             quality = "Good"
         elif families:
@@ -217,6 +236,13 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 nearest_km=round(nearest / 1000, 1) if nearest is not None else None,
                 producer_count=len(producers),
                 host_rocks=rock["terms"] if rock else [],
+                samples=[
+                    {
+                        k: e.raw_value.get(k)
+                        for k in ("title", "rock_type", "confirmed", "distance_km", "project")
+                    }
+                    for e in mine
+                ],
                 papers=[
                     {k: e.raw_value.get(k) for k in ("title", "year", "url", "studied")}
                     for e in papers
@@ -228,13 +254,14 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
     )
 
 
-def _zones(request, assessments, layers, occurrences) -> dict:
+def _zones(request, assessments, layers, occurrences, samples) -> dict:
     from .zones import build_zones
 
     spatial = [
         a.commodity
         for a in assessments
-        if a.prospectivity != Category.INSUFFICIENT and (a.site_count or a.host_rocks)
+        if a.prospectivity != Category.INSUFFICIENT
+        and (a.site_count or a.host_rocks or any(s["confirmed"] for s in a.samples))
     ][:4]
     if not spatial:
         return {"cell_km": None, "by_commodity": {}}
@@ -247,12 +274,25 @@ def _zones(request, assessments, layers, occurrences) -> dict:
         place,
         spatial,
         layers,
-        occurrences,
+        occurrences
+        + [
+            # Confirmed samples are positioned evidence, like a recorded site.
+            {
+                "lat": e.raw_value["lat"],
+                "lng": e.raw_value["lng"],
+                "status": "Your confirmed sample",
+                "commodities": [e.commodity],
+            }
+            for e in samples
+            if e.raw_value.get("confirmed")
+        ],
     )
 
 
-def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) -> dict:
-    evidence = [e for provider in providers for e in provider.evidence]
+def build_analysis(
+    request: AnalysisRequest, providers: list[ProviderResult], samples: list | None = None
+) -> dict:
+    evidence = [e for provider in providers for e in provider.evidence] + list(samples or [])
     geology = [e for e in evidence if e.evidence_type == "mapped_geology"]
     occurrences = sorted(
         [o for p in providers for o in p.occurrences], key=lambda o: o["distance_m"]
@@ -325,7 +365,7 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
         "assessments": [a.model_dump() for a in assessments],
         "occurrences": occurrences,
         "geology_units": units,
-        "zones": _zones(request, assessments, layers, occurrences),
+        "zones": _zones(request, assessments, layers, occurrences, samples or []),
         "place": (layers.pop("place", None) or [request.location.name])[0],
         "layers": layers,
         "structure": next(

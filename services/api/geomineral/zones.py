@@ -54,6 +54,8 @@ def _summary(commodity: str, parts: list[dict]) -> list[str]:
         out.append(f"{len(sites)} recorded {commodity.lower()} {noun} in and around the zone")
     if any(p["producer"] for p in parts):
         out.append("Includes a past or present producing mine")
+    if any(p.get("sample") for p in parts):
+        out.append("Includes your lab-confirmed sample")
     if faults:
         out.append(f"Mapped fault as close as {min(faults):.1f} km")
     return out
@@ -114,7 +116,11 @@ def build_zones(
     result = {"cell_km": round(cell, 2), "by_commodity": {}}
     for commodity in commodities:
         sites = [
-            (fwd(o["lng"], o["lat"]), "producer" in str(o.get("status", "")).lower())
+            (
+                fwd(o["lng"], o["lat"]),
+                "producer" in str(o.get("status", "")).lower(),
+                o.get("status") == "Your confirmed sample",
+            )
             for o in occurrences
             if commodity in o.get("commodities", [])
         ]
@@ -131,13 +137,16 @@ def build_zones(
                 if kind:
                     g = 1.0 if kind == "direct" else 0.6
                     why["rock"] = under[c][1] or "rock unit"
-            near = [i for i, (p, _) in enumerate(sites) if math.dist(p, c) <= SITE_KM]
+            near = [i for i, (p, _, _) in enumerate(sites) if math.dist(p, c) <= SITE_KM]
             s = min(1.0, len(near) / 3) * 0.8 if near else 0.0
             if near:
                 why["sites"] = set(near)
                 if any(sites[i][1] for i in near):
                     s += 0.2
                     why["producer"] = True
+                if any(sites[i][2] for i in near):
+                    s = min(1.0, s + 0.2)
+                    why["sample"] = True
             f = 0.0
             if commodity in STRUCTURAL and c in fault_d and (g or s):
                 if fault_d[c] <= FAULT_KM:
