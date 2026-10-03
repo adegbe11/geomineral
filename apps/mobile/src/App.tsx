@@ -21,6 +21,7 @@ import { Camera, Compass, Folder, Home, UserRound, X } from "lucide-react-native
 import { Brand, Button, Header } from "./components/Primitives";
 import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
 import HomeScreen from "./HomeScreen";
+import IdentifyScreen from "./IdentifyScreen";
 import MineralGuide from "./MineralGuide";
 import { FadeIn, haptic, StackScreen, TabFade } from "./motion";
 import { Profile, ProjectDetail, ProjectsList } from "./ProjectScreens";
@@ -35,7 +36,8 @@ type Route =
   | { name: "analysis" }
   | { name: "report" }
   | { name: "guide"; query: string }
-  | { name: "project" };
+  | { name: "project" }
+  | { name: "identify"; suggested: string[] };
 const TABS = [
   ["Home", Home],
   ["Explore", Compass],
@@ -124,6 +126,7 @@ function Shell() {
     if (tab) w.setTab(tab);
   };
   const openGuide = (query = "") => push({ name: "guide", query });
+  const identify = (suggested: string[] = []) => push({ name: "identify", suggested });
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (stack.length) {
@@ -209,6 +212,8 @@ function Shell() {
             guide={openGuide}
           />
         );
+      case "identify":
+        return <IdentifyScreen back={back} suggested={r.suggested} open={openGuide} />;
       case "report":
         return <ReportScreen back={back} />;
       case "guide":
@@ -218,6 +223,7 @@ function Shell() {
             back={back}
             signIn={() => setAuth(true)}
             explore={() => home("Explore")}
+            identify={() => identify()}
           />
         );
       case "project":
@@ -291,6 +297,7 @@ function Shell() {
               <HomeScreen
                 analyze={() => analyze()}
                 guide={openGuide}
+                identify={() => identify()}
                 openRecent={(id) => {
                   w.openRecent(id);
                   push({ name: "analysis" });
@@ -299,7 +306,7 @@ function Shell() {
             ) : w.tab === "Explore" ? (
               <Explore analyze={() => analyze()} save={save} results={() => push({ name: "analysis" })} />
             ) : w.tab === "Scan" ? (
-              <Scanner signIn={() => setAuth(true)} guide={openGuide} />
+              <Scanner signIn={() => setAuth(true)} guide={openGuide} testIt={identify} />
             ) : w.tab === "Projects" ? (
               <ProjectsList
                 projects={projects}

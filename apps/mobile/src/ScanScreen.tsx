@@ -130,9 +130,11 @@ function Corners() {
 export function Scanner({
   signIn,
   guide,
+  testIt,
 }: {
   signIn: () => void;
   guide: (query?: string) => void;
+  testIt: (suggested: string[]) => void;
 }) {
   const w = useWorkspace();
   const { c, ui } = useTheme();
@@ -352,16 +354,26 @@ export function Scanner({
                       );
                     })}
                     {!!result.observations && <Text style={ui.body}>{result.observations}</Text>}
-                    <Button
-                      outline
-                      title={`About ${suspected || result.candidates[0]}`}
-                      onPress={() => guide(suspected || result.candidates![0])}
-                    />
+                    <View style={[ui.row, { gap: 8 }]}>
+                      <Button
+                        style={{ flex: 1 }}
+                        outline
+                        title={`About ${suspected || result.candidates[0]}`}
+                        onPress={() => guide(suspected || result.candidates![0])}
+                      />
+                      <Button
+                        style={{ flex: 1 }}
+                        outline
+                        title="Test It"
+                        onPress={() => testIt(result.candidates ?? [])}
+                      />
+                    </View>
                   </>
                 ) : (
                   <>
                     <Text style={ui.h2}>{result.candidate}</Text>
                     <Text style={ui.body}>{result.next_check}</Text>
+                    <Button outline title="Identify by Tests" onPress={() => testIt([])} />
                   </>
                 )}
               </View>

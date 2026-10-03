@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { ChevronRight, MapPin, Search } from "lucide-react-native";
+import { ChevronRight, FlaskConical, MapPin, Search } from "lucide-react-native";
 import { Button, Empty, Header, Row } from "./components/Primitives";
 import MineralArt from "./components/MineralArt";
 import { RatingPill } from "./ExploreScreens";
@@ -14,6 +14,7 @@ import {
   sourceName,
   type Mineral,
 } from "./minerals";
+import { fluorescence, magnetism } from "./identify";
 import { FadeIn, Float, haptic, Pressy } from "./motion";
 import { useWorkspace } from "./state/Workspace";
 import { api, post } from "./services/api";
@@ -35,11 +36,13 @@ export default function MineralGuide({
   initialQuery = "",
   signIn,
   explore,
+  identify,
 }: {
   back: () => void;
   initialQuery?: string;
   signIn: () => void;
   explore: () => void;
+  identify: () => void;
 }) {
   const w = useWorkspace();
   const { c, ui } = useTheme();
@@ -137,6 +140,22 @@ export default function MineralGuide({
                 style={{ flex: 1, height: 44, ...type.body, color: c.label }}
               />
             </View>
+            <Pressy
+              accessibilityRole="button"
+              accessibilityLabel="Identify by Tests"
+              onPress={identify}
+              scaleTo={0.98}
+              style={[ui.card, ui.row, { gap: 12, paddingVertical: 14 }]}
+            >
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.tintSoft, alignItems: "center", justifyContent: "center" }}>
+                <FlaskConical size={18} color={c.tint} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={ui.h3}>Identify by Tests</Text>
+                <Text style={ui.small}>Shine, scratch, streak, magnet, UV</Text>
+              </View>
+              <ChevronRight size={18} color={c.tertiary} />
+            </Pressy>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }}>
               <View style={[ui.row, { gap: 8, paddingHorizontal: 16 }]}>
                 {GROUPS.map((g) => (
@@ -224,9 +243,15 @@ export default function MineralGuide({
             </FadeIn>
             {!selected.rock && (
               <FadeIn index={1}>
-                <View style={[ui.card, ui.row, { alignItems: "flex-start" }]}>
-                  <Fact label="Streak" value={selected.streak} />
-                  <Fact label="Lustre" value={selected.luster} />
+                <View style={[ui.card, { gap: 14 }]}>
+                  <View style={[ui.row, { alignItems: "flex-start" }]}>
+                    <Fact label="Streak" value={selected.streak} />
+                    <Fact label="Lustre" value={selected.luster} />
+                  </View>
+                  <View style={[ui.row, { alignItems: "flex-start" }]}>
+                    <Fact label="Magnet" value={magnetism(selected)} />
+                    <Fact label="UV glow" value={fluorescence(selected)} />
+                  </View>
                 </View>
               </FadeIn>
             )}

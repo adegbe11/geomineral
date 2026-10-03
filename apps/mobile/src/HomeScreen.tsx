@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Animated, Platform, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { BookOpen, Folder, MapPin, UserRound } from "lucide-react-native";
+import { BookOpen, FlaskConical, Folder, MapPin, UserRound } from "lucide-react-native";
 import { Brand, Button, MineralArt, Row } from "./components/Primitives";
 import OrbitingEarth from "./components/OrbitingEarth";
 import PlaceSearch from "./components/PlaceSearch";
@@ -21,10 +21,12 @@ const today = () => {
 export default function HomeScreen({
   analyze,
   guide,
+  identify,
   openRecent,
 }: {
   analyze: () => void;
   guide: (name?: string) => void;
+  identify: () => void;
   openRecent: (id: string) => void;
 }) {
   const w = useWorkspace();
@@ -171,6 +173,11 @@ export default function HomeScreen({
             detail={`${minerals.length}`}
             onPress={() => guide()}
             icon={<BookOpen size={20} color={c.tint} />}
+          />
+          <Row
+            title="Identify by Tests"
+            onPress={identify}
+            icon={<FlaskConical size={20} color={c.tint} />}
           />
           <Row
             title="My Projects"

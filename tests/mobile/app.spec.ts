@@ -290,3 +290,20 @@ test("mineral guide covers rocks and links look-alikes", async ({ page }) => {
   await page.screenshot({ path: "test-results/guide-pyrite.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("identify by tests separates gold from pyrite", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("button", { name: "Identify by Tests", exact: true }).click();
+  await page.getByRole("button", { name: "Shine: Metallic" }).click();
+  await page.getByRole("button", { name: "Softest thing that scratches it: Coin" }).click();
+  await page.getByRole("button", { name: "Streak: Metal colour" }).click();
+  await expect(page.getByRole("button", { name: "Open Gold profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Pyrite profile" })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/identify.png", fullPage: true });
+  await page.getByRole("button", { name: "Open Gold profile" }).click();
+  await expect(page.getByText("Recognition clues", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
