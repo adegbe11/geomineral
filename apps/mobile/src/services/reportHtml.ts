@@ -125,7 +125,7 @@ export function reportHtml(a: Analysis, coords: string) {
       ? `<table><tr><th>Mineral</th><th>Rating</th><th>Why</th></tr>${minerals
           .map(
             (m) =>
-              `<tr><td><b>${esc(m.commodity)}</b></td><td><span class="dot" style="background:${ratingColor(m.prospectivity)}"></span>${esc(label(m.prospectivity))}</td><td>${esc(m.explanation)}</td></tr>`,
+              `<tr><td><b>${esc(m.commodity)}</b></td><td><span class="dot" style="background:${ratingColor(m.prospectivity)}"></span>${esc(label(m.prospectivity))}</td><td>${esc(m.explanation)}${(m.papers ?? []).slice(0, 3).map((p) => `<br/><span class="muted">${p.studied ? "Study" : "Mention"}: <a href="${esc(p.url)}">${esc(p.title)}</a>${p.year ? ` (${p.year})` : ""}</span>`).join("")}</td></tr>`,
           )
           .join("")}</table>`
       : `<p class="muted">No mineral signal from connected sources.</p>`

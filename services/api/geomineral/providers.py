@@ -11,6 +11,7 @@ import httpx
 
 from .config import LIVE_PROVIDERS, USER_AGENT
 from .geo import distance_m
+from .literature import OPENALEX, LiteratureProvider
 from .schemas import Evidence, Point, ProviderResult, Source
 
 log = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ MRDS = Source(
     resolution="Point locations; positional accuracy varies by record",
     notes="Historical compilation. Records may be incomplete or outdated; a mine record does not establish current activity.",
 )
-SOURCES = [MACROSTRAT, MRDS]
+SOURCES = [MACROSTRAT, MRDS, OPENALEX]
 WFS_URL = "https://mrdata.usgs.gov/services/wfs/mrds"
 MS_NS = "http://mapserver.gis.umn.edu/mapserver"
 GML_NS = "http://www.opengis.net/gml"
@@ -271,6 +272,7 @@ async def collect(location: Point, radius_km: float, disabled: set[str]) -> list
     providers = [
         MacrostratProvider(),
         USGSOccurrenceProvider(),
+        LiteratureProvider(),
         *COUNTRY_PROVIDERS.get(location.country_code or "", []),
     ]
     async with httpx.AsyncClient(

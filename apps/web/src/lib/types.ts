@@ -55,6 +55,7 @@ export type Assessment = {
   nearest_km?: number | null;
   producer_count?: number;
   host_rocks?: string[];
+  papers?: { title: string; year: number | null; url: string; studied: boolean }[];
 };
 export type GeologyUnit = {
   name: string;

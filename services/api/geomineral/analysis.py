@@ -96,6 +96,9 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
         ]
         negative = [e for e in related if e.direction == "negative"]
         rock = rocks.get(commodity)
+        papers = list(
+            {e.feature_id: e for e in related if e.evidence_type == "literature"}.values()
+        )
 
         score = 0
         if rock:
@@ -108,6 +111,15 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
             score += 1
         if producers:
             score += 1
+        # Studies naming the mineral in title/abstract count fully; full-text mentions alone
+        # can only lift a mineral to "possible".
+        studied = [e for e in papers if e.raw_value.get("studied")]
+        if studied:
+            score += 1
+        if len(studied) >= 2:
+            score += 1
+        if papers and not studied and score == 0:
+            score = 1
         if negative:
             category = Category.INSUFFICIENT
         elif score >= 4:
@@ -137,12 +149,26 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 if rock["kind"] == "direct"
                 else f"Mapped {rocks_text} here commonly hosts {commodity.lower()}."
             )
+        if papers:
+            place = papers[0].raw_value.get("place", "this place")
+            if studied:
+                parts.append(
+                    f"Studied at {place} in {len(studied)} published "
+                    f"{'paper' if len(studied) == 1 else 'papers'}."
+                )
+            mentions = len(papers) - len(studied)
+            if mentions:
+                parts.append(
+                    f"Mentioned in {mentions} {'more ' if studied else ''}"
+                    f"{'paper' if mentions == 1 else 'papers'} about {place}."
+                )
         if negative:
             parts.append("Contradictory evidence is present and needs professional review.")
 
-        if rock and len(sites) >= 3:
+        families = sum(bool(x) for x in (rock, sites, studied))
+        if families >= 2 and (len(sites) >= 3 or len(studied) >= 2):
             quality = "Good"
-        elif rock or sites:
+        elif families:
             quality = "Limited"
         else:
             quality = "Very Limited"
@@ -159,6 +185,10 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 nearest_km=round(nearest / 1000, 1) if nearest is not None else None,
                 producer_count=len(producers),
                 host_rocks=rock["terms"] if rock else [],
+                papers=[
+                    {k: e.raw_value.get(k) for k in ("title", "year", "url", "studied")}
+                    for e in papers
+                ],
             )
         )
     return sorted(

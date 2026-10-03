@@ -380,6 +380,33 @@ function MineralRow({ m, guide }: { m: Assessment; guide: (q: string) => void })
           <RatingPill rating={m.prospectivity} />
         </View>
         <Text style={ui.body}>{m.explanation}</Text>
+        {!!m.papers?.length && (
+          <View style={{ gap: 6, marginTop: 2 }}>
+            <Text style={ui.caption}>Research</Text>
+            {m.papers.slice(0, 3).map((p) => (
+              <Pressable
+                key={p.url}
+                accessibilityRole="link"
+                accessibilityLabel={`Open paper: ${p.title}`}
+                onPress={() => {
+                  if (p.url.startsWith("https://")) void Linking.openURL(p.url);
+                }}
+                style={({ pressed }) => [
+                  ui.row,
+                  { gap: 8, alignItems: "flex-start", padding: 10, borderRadius: 12, backgroundColor: pressed ? c.fillStrong : c.fill },
+                ]}
+              >
+                <Text style={[ui.badge, !p.studied && { color: c.secondary, backgroundColor: c.fillStrong }]}>
+                  {p.studied ? "Study" : "Mention"}
+                </Text>
+                <Text style={[ui.small, { flex: 1, color: c.label }]} numberOfLines={2}>
+                  {p.title}
+                  {p.year ? <Text style={ui.small}>{` · ${p.year}`}</Text> : null}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <Pressable
           accessibilityRole="button"
           onPress={() => guide(m.commodity)}

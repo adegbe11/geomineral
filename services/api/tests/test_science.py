@@ -244,9 +244,10 @@ async def test_provider_failure_is_isolated(monkeypatch):
 
     monkeypatch.setattr(providers.MacrostratProvider, "fetch", fails)
     monkeypatch.setattr(providers.USGSOccurrenceProvider, "fetch", empty)
+    monkeypatch.setattr(providers.LiteratureProvider, "fetch", empty)
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = await providers.collect(Point(lat=0, lng=0), 25, set())
-    assert [r.status for r in results] == ["unavailable", "empty"]
+    assert [r.status for r in results] == ["unavailable", "empty", "empty"]
 
 
 async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):
@@ -327,3 +328,91 @@ async def test_land_status_picks_most_restrictive_and_handles_gaps(monkeypatch):
     assert (await land.lookup(40.0, -100.0))["status"] == "No public land record"
     outside = await land.lookup(6.98, 6.12)
     assert outside["covered"] is False
+
+
+def _work(wid, title, abstract="", year=2023):
+    words = abstract.split()
+    return {
+        "id": f"https://openalex.org/{wid}",
+        "display_name": title,
+        "publication_year": year,
+        "doi": f"https://doi.org/10.0/{wid}",
+        "abstract_inverted_index": {w: [i] for i, w in enumerate(words)},
+    }
+
+
+async def test_literature_finds_studied_minerals_and_skips_farming_papers(monkeypatch):
+    from geomineral import analysis, literature
+
+    literature._cache.clear()
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    works = [
+        _work("W1", "Assessment of the refractory properties of clay mineral deposits in Uhonmora"),
+        _work(
+            "W2",
+            "Kaolin and clay deposits of the Owan basin",
+            "Clay samples from Uhonmora were studied",
+        ),
+        _work(
+            "W3",
+            "Micronutrient assessment of cocoa plantations at Uhonmora",
+            "copper zinc iron in soils",
+        ),
+        _work("W4", "Gold mineralization in Ilesha schist belt", "no mention of the town"),
+    ]
+
+    def handler(request):
+        assert request.url.params["search"] == '"Uhonmora"'
+        return httpx.Response(200, json={"results": works})
+
+    real = httpx.AsyncClient
+    async with real(transport=httpx.MockTransport(handler)) as client:
+        result = await literature.LiteratureProvider().fetch(
+            client, Point(lat=6.98, lng=6.12, name="Uhonmora, Edo State, Nigeria"), 25
+        )
+    found = {(e.commodity, e.feature_id.rsplit("/", 1)[-1]) for e in result.evidence}
+    assert ("Clay", "W1") in found and ("Clay", "W2") in found and ("Kaolin", "W2") in found
+    assert not any(c in ("Copper", "Zinc", "Iron", "Gold") for c, _ in found)
+    clay = next(a for a in analysis.assess(result.evidence) if a.commodity == "Clay")
+    assert clay.prospectivity == "Moderate"
+    assert clay.papers[0]["studied"] is True
+    assert "Studied at Uhonmora in 2 published papers" in clay.explanation
+
+
+async def test_full_text_mentions_need_a_key_and_only_reach_low(monkeypatch):
+    from geomineral import analysis, literature
+
+    literature._cache.clear()
+    monkeypatch.setenv("OPENALEX_API_KEY", "test-only-key")
+    road = _work(
+        "W9", "Troubled roads: surface geophysics of the sedimentary terrain", "Uhonmora shale"
+    )
+
+    def handler(request):
+        assert request.url.params["api_key"] == "test-only-key"
+        q = request.url.params["search"]
+        return httpx.Response(200, json={"results": [road] if q == '"Uhonmora" gypsum' else []})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await literature.LiteratureProvider().fetch(
+            client, Point(lat=6.98, lng=6.12, name="Uhonmora"), 25
+        )
+    gypsum = [a for a in analysis.assess(result.evidence) if a.commodity == "Gypsum"][0]
+    assert gypsum.prospectivity == "Low"
+    assert gypsum.papers[0]["studied"] is False
+    assert "Mentioned in 1 paper about Uhonmora" in gypsum.explanation
+
+
+async def test_literature_limit_is_reported_not_treated_as_absence(monkeypatch):
+    from geomineral import literature
+
+    literature._cache.clear()
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(429, json={"error": "limit"}))
+    ) as client:
+        result = await literature.LiteratureProvider().fetch(
+            client, Point(lat=1, lng=2, name="Kumasi"), 25
+        )
+    assert result.status == "unavailable"
+    assert "allowance" in result.message
