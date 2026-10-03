@@ -106,7 +106,7 @@ def test_summary_names_best_signal_and_site_count():
     assert "1 recorded mineral sites within 25 km" in result["summary"]
 
 
-def test_generic_sedimentary_rock_does_not_become_limestone():
+def test_generic_sedimentary_rock_is_only_possible_clay_and_sand():
     host = Evidence(
         id="host",
         source_id="fixture",
@@ -115,7 +115,10 @@ def test_generic_sedimentary_rock_does_not_become_limestone():
         description="Synthetic generic sediment",
         raw_value={"lith": "sedimentary"},
     )
-    assert assess([host]) == []
+    found = {a.commodity: a for a in assess([host])}
+    assert set(found) == {"Clay", "Sand and gravel"}
+    assert all(a.prospectivity == "Low" for a in found.values())
+    assert "common in sedimentary rocks" in found["Clay"].explanation
 
 
 def test_unavailable_is_not_empty_and_no_percentage_claims():
@@ -244,11 +247,12 @@ async def test_provider_failure_is_isolated(monkeypatch):
 
     monkeypatch.setattr(providers.MacrostratProvider, "fetch", fails)
     monkeypatch.setattr(providers.USGSOccurrenceProvider, "fetch", empty)
+    monkeypatch.setattr(providers.WikidataMinesProvider, "fetch", empty)
     monkeypatch.setattr(providers.LiteratureProvider, "fetch", empty)
     monkeypatch.setattr(providers.StructureProvider, "fetch", empty)
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = await providers.collect(Point(lat=0, lng=0), 25, set())
-    assert [r.status for r in results] == ["unavailable", "empty", "empty", "empty"]
+    assert [r.status for r in results] == ["unavailable", "empty", "empty", "empty", "empty"]
 
 
 async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):
@@ -363,6 +367,8 @@ async def test_literature_finds_studied_minerals_and_skips_farming_papers(monkey
     ]
 
     def handler(request):
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(200, json={"address": {}})
         assert request.url.params["search"] == '"Uhonmora"'
         return httpx.Response(200, json={"results": works})
 
@@ -390,6 +396,8 @@ async def test_full_text_mentions_need_a_key_and_only_reach_low(monkeypatch):
     )
 
     def handler(request):
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(200, json={"address": {}})
         assert request.url.params["api_key"] == "test-only-key"
         q = request.url.params["search"]
         return httpx.Response(200, json={"results": [road] if q == '"Uhonmora" gypsum' else []})
@@ -404,19 +412,81 @@ async def test_full_text_mentions_need_a_key_and_only_reach_low(monkeypatch):
     assert "Mentioned in 1 paper about Uhonmora" in gypsum.explanation
 
 
-async def test_literature_limit_is_reported_not_treated_as_absence(monkeypatch):
+async def test_research_falls_back_to_crossref_when_openalex_is_limited(monkeypatch):
     from geomineral import literature
 
     literature._cache.clear()
     monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
-    async with httpx.AsyncClient(
-        transport=httpx.MockTransport(lambda r: httpx.Response(429, json={"error": "limit"}))
-    ) as client:
+
+    def handler(request):
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(200, json={"address": {"village": "Uhonmora"}})
+        if request.url.host == "api.openalex.org":
+            return httpx.Response(429, json={"error": "limit"})
+        item = {
+            "DOI": "10.0/clay",
+            "title": ["Refractory properties of clay deposits in Uhonmora"],
+            "issued": {"date-parts": [[2015]]},
+        }
+        return httpx.Response(200, json={"message": {"items": [item]}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await literature.LiteratureProvider().fetch(
+            client, Point(lat=7.1, lng=6.2, name="Owan West, Edo, Nigeria"), 25
+        )
+    assert result.status == "available"
+    assert [e.commodity for e in result.evidence] == ["Clay"]
+    assert result.layers["place"] == ["Uhonmora"]
+    # A backup-only answer is cached for hours, not the full week.
+    stamp, _ = literature._cache["uhonmora"]
+    assert stamp < literature.time.time() - literature.CACHE_SECONDS + 7 * 3600
+
+
+async def test_research_outage_is_reported_not_treated_as_absence(monkeypatch):
+    from geomineral import literature
+
+    literature._cache.clear()
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+
+    def handler(request):
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(200, json={"address": {}})
+        return httpx.Response(503)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         result = await literature.LiteratureProvider().fetch(
             client, Point(lat=1, lng=2, name="Kumasi"), 25
         )
     assert result.status == "unavailable"
-    assert "allowance" in result.message
+    assert result.evidence == []
+
+
+async def test_mines_inside_radius_are_sites_and_regional_mines_only_possible():
+    from geomineral import mines
+    from geomineral.analysis import assess
+
+    mines._cache.clear()
+
+    def row(qid, lat, lng, products):
+        return {
+            "m": {"value": f"http://www.wikidata.org/entity/{qid}"},
+            "mLabel": {"value": f"{qid} mine"},
+            "loc": {"value": f"Point({lng} {lat})"},
+            "products": {"value": products},
+        }
+
+    def handler(request):
+        rows = [row("Q1", 7.2, 6.2, "gold ore"), row("Q2", 7.6, 6.2, "iron ore|limestone")]
+        return httpx.Response(200, json={"results": {"bindings": rows}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await mines.WikidataMinesProvider().fetch(client, Point(lat=7.17, lng=6.21), 25)
+    assert [o["id"] for o in result.occurrences] == ["Q1"]
+    found = {a.commodity: a for a in assess(result.evidence)}
+    assert found["Gold"].site_count == 1
+    assert found["Iron"].prospectivity == "Low"
+    assert found["Iron"].site_count == 0
+    assert "Mined in the region: Q2 mine" in found["Iron"].explanation
 
 
 def test_nearby_fault_strengthens_but_never_creates_a_candidate():

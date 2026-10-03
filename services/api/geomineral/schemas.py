@@ -92,6 +92,7 @@ class Assessment(BaseModel):
     nearest_km: float | None = None
     producer_count: int = 0
     host_rocks: list[str] = Field(default_factory=list)
+    rock_kind: str | None = None
     papers: list[dict] = Field(default_factory=list)
     samples: list[dict] = Field(default_factory=list)
 

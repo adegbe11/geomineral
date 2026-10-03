@@ -464,6 +464,7 @@ def test_stalled_source_is_cut_off(monkeypatch):
         providers.USGSOccurrenceProvider,
         providers.LiteratureProvider,
         providers.StructureProvider,
+        providers.WikidataMinesProvider,
     ):
         monkeypatch.setattr(cls, "fetch", stall)
     monkeypatch.setattr(providers, "PROVIDER_DEADLINE", 0.05)

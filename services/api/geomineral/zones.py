@@ -30,6 +30,8 @@ def _proj(lat: float, lng: float):
 def _rock_kind(text: str, commodity: str) -> str | None:
     kind = None
     for rule in ROCK_RULES:
+        if rule["kind"] == "setting":
+            continue
         if commodity in rule["commodities"] and any(t in text for t in rule["terms"]):
             if rule["kind"] == "direct":
                 return "direct"

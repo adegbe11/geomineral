@@ -13,11 +13,12 @@ MISSING = [
     "No verified local structural or alteration model",
 ]
 # "direct": the mapped rock is itself the commodity. "host": the rock commonly hosts it.
+# "setting": a broad rock class where the material is common (only ever "possible").
 # Terms are matched against a map unit's lithology and name only.
 ROCK_RULES = [
     {"commodities": ["Limestone"], "terms": ["limestone"], "kind": "direct"},
     {"commodities": ["Gypsum"], "terms": ["gypsum", "evaporite"], "kind": "direct"},
-    {"commodities": ["Clay"], "terms": ["claystone"], "kind": "direct"},
+    {"commodities": ["Clay"], "terms": ["claystone", "shale", "mudstone"], "kind": "direct"},
     {"commodities": ["Kaolin"], "terms": ["kaolin"], "kind": "direct"},
     {"commodities": ["Marble"], "terms": ["marble"], "kind": "direct"},
     {"commodities": ["Salt"], "terms": ["halite", "rock salt"], "kind": "direct"},
@@ -45,7 +46,30 @@ ROCK_RULES = [
     {"commodities": ["Rare earth elements", "Niobium"], "terms": ["carbonatite"], "kind": "host"},
     {"commodities": ["Diamond"], "terms": ["kimberlite", "lamproite"], "kind": "host"},
     {"commodities": ["Aluminium"], "terms": ["laterite"], "kind": "host"},
+    {
+        "commodities": ["Clay", "Sand and gravel"],
+        "terms": ["sedimentary", "alluvium", "alluvial", "sandstone", "unconsolidated"],
+        "kind": "setting",
+    },
+    {
+        "commodities": ["Crushed stone"],
+        "terms": [
+            "granite",
+            "granitic",
+            "gneiss",
+            "basement",
+            "igneous",
+            "plutonic",
+            "metamorphic",
+            "basalt",
+            "migmatite",
+            "charnockite",
+            "quartzite",
+        ],
+        "kind": "setting",
+    },
 ]
+KIND_RANK = {"setting": 0, "host": 1, "direct": 2}
 RANK = {Category.HIGH: 3, Category.MODERATE: 2, Category.LOW: 1, Category.INSUFFICIENT: 0}
 NEAR_KM = 5
 # Ore fluids often travel along faults; these commodities are commonly fault-controlled.
@@ -83,8 +107,8 @@ def _rock_matches(geology: list[Evidence]) -> dict[str, dict]:
                 continue
             for commodity in rule["commodities"]:
                 hit = found.setdefault(commodity, {"kind": rule["kind"], "terms": [], "ids": []})
-                if rule["kind"] == "direct":
-                    hit["kind"] = "direct"
+                if KIND_RANK[rule["kind"]] > KIND_RANK[hit["kind"]]:
+                    hit["kind"] = rule["kind"]
                 hit["terms"] += [t for t in terms if t not in hit["terms"]]
                 if e.id not in hit["ids"]:
                     hit["ids"].append(e.id)
@@ -115,6 +139,10 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
         ]
         negative = [e for e in related if e.direction == "negative"]
         rock = rocks.get(commodity)
+        regional = sorted(
+            (e for e in related if e.evidence_type == "regional_mine"),
+            key=lambda e: e.distance_m or 0,
+        )
         papers = list(
             {e.feature_id: e for e in related if e.evidence_type == "literature"}.values()
         )
@@ -141,6 +169,9 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
         if len(studied) >= 2:
             score += 1
         if papers and not studied and score == 0:
+            score = 1
+        # A mine elsewhere in the region says the ground can carry it; never more than possible.
+        if regional and score == 0:
             score = 1
         # A laboratory result from the user's own sample is the strongest local evidence.
         if confirmed:
@@ -176,9 +207,17 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
         if rock:
             rocks_text = ", ".join(rock["terms"])
             parts.append(
-                f"Mapped {rocks_text} here is a direct source of {commodity.lower()}."
-                if rock["kind"] == "direct"
-                else f"Mapped {rocks_text} here commonly hosts {commodity.lower()}."
+                {
+                    "direct": f"Mapped {rocks_text} here is a direct source of {commodity.lower()}.",
+                    "host": f"Mapped {rocks_text} here commonly hosts {commodity.lower()}.",
+                    "setting": f"{commodity} is common in {rocks_text} rocks like those mapped here.",
+                }[rock["kind"]]
+            )
+        if regional and not sites:
+            near = regional[0]
+            parts.append(
+                f"Mined in the region: {near.raw_value['name']}, "
+                f"{(near.distance_m or 0) / 1000:.0f} km away."
             )
         if papers:
             place = papers[0].raw_value.get("place", "this place")
@@ -236,6 +275,7 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 nearest_km=round(nearest / 1000, 1) if nearest is not None else None,
                 producer_count=len(producers),
                 host_rocks=rock["terms"] if rock else [],
+                rock_kind=rock["kind"] if rock else None,
                 samples=[
                     {
                         k: e.raw_value.get(k)
@@ -261,7 +301,11 @@ def _zones(request, assessments, layers, occurrences, samples) -> dict:
         a.commodity
         for a in assessments
         if a.prospectivity != Category.INSUFFICIENT
-        and (a.site_count or a.host_rocks or any(s["confirmed"] for s in a.samples))
+        and (
+            a.site_count
+            or (a.host_rocks and a.rock_kind != "setting")
+            or any(s["confirmed"] for s in a.samples)
+        )
     ][:4]
     if not spatial:
         return {"cell_km": None, "by_commodity": {}}

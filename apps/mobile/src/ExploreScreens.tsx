@@ -468,6 +468,7 @@ function Stat({ label, value, suffix }: { label: string; value: number; suffix?:
 const STAGES = [
   ["macrostrat", "Geological map"],
   ["usgs-mrds", "Mine and mineral records"],
+  ["wikidata-mines", "Known mines worldwide"],
   ["openalex", "Published research"],
   ["macrostrat-structure", "Faults and structure"],
 ] as const;

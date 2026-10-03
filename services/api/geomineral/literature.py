@@ -8,9 +8,11 @@ paper about copper in cocoa leaves never becomes copper evidence.
 """
 
 import asyncio
+import json
 import os
 import re
 import time
+from pathlib import Path
 
 import httpx
 
@@ -83,8 +85,10 @@ EXCLUDE = re.compile(
 GENERIC_NAMES = re.compile(
     r"^(-?\d+(\.\d+)?, ?-?\d+(\.\d+)?|Selected map location|Current location|Area vertex)$"
 )
-_cache: dict[str, tuple[float, list[Evidence], str]] = {}
+# name -> (unix time, [[work, term, studied], ...]); on disk so restarts keep the budget.
+_cache: dict[str, tuple[float, list]] = {}
 CACHE_SECONDS = 7 * 86400
+CROSSREF_URL = "https://api.crossref.org/works"
 
 
 def relevant(title: str) -> bool:
@@ -92,6 +96,8 @@ def relevant(title: str) -> bool:
 
 
 def abstract(work: dict) -> str:
+    if "_abstract" in work:
+        return work["_abstract"]
     inv = work.get("abstract_inverted_index") or {}
     return " ".join(t for _, t in sorted((p, t) for t, ps in inv.items() for p in ps))
 
@@ -100,11 +106,38 @@ def word(term: str) -> re.Pattern:
     return re.compile(r"\b" + re.escape(term.strip('"')) + r"\w*", re.I)
 
 
-async def place_name(client: httpx.AsyncClient, point: Point) -> str:
-    """Most local name for the point: given name, else town/village from OpenStreetMap."""
-    first = (point.name or "").split(",")[0].strip()
-    if first and not GENERIC_NAMES.match(point.name or ""):
-        return first
+def _cache_file() -> Path | None:
+    path = os.getenv("RESEARCH_CACHE", ".data/research-cache.json")
+    return Path(path) if path else None
+
+
+def _load_cache():
+    f = _cache_file()
+    if _cache or not f or not f.exists():
+        return
+    try:
+        _cache.update({k: tuple(v) for k, v in json.loads(f.read_text("utf-8")).items()})
+    except (OSError, ValueError):
+        pass
+
+
+def _save_cache():
+    f = _cache_file()
+    if not f:
+        return
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(_cache), "utf-8")
+    except OSError:
+        pass
+
+
+async def place_names(client: httpx.AsyncClient, point: Point) -> list[str]:
+    """Local names to search, most local first: nearest village/town, given name, district."""
+    given = (point.name or "").split(",")[0].strip()
+    if GENERIC_NAMES.match(point.name or ""):
+        given = ""
+    local = district = ""
     try:
         r = await client.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -112,12 +145,19 @@ async def place_name(client: httpx.AsyncClient, point: Point) -> str:
         )
         r.raise_for_status()
         a = r.json().get("address", {})
+        local = next(
+            (str(a[k]) for k in ("village", "town", "city", "hamlet", "suburb") if a.get(k)), ""
+        )
+        district = next(
+            (str(a[k]) for k in ("county", "municipality", "state_district") if a.get(k)), ""
+        )
     except (httpx.HTTPError, ValueError):
-        return ""
-    for key in ("village", "town", "city", "municipality", "suburb", "county"):
-        if a.get(key):
-            return str(a[key])
-    return ""
+        pass
+    names = []
+    for n in (local, given, district):
+        if len(n) >= 3 and n.lower() not in [x.lower() for x in names]:
+            names.append(n)
+    return names[:3]
 
 
 class Limited(Exception):
@@ -147,110 +187,156 @@ async def _search(client, sem, query: str, per_page: int):
         return r.json().get("results", [])
 
 
+async def _crossref(client, name: str) -> list[dict]:
+    """Backup index with no daily cap; works are shaped like OpenAlex results."""
+    r = await client.get(
+        CROSSREF_URL,
+        params={"query.bibliographic": name, "rows": 60, "select": "DOI,title,abstract,issued"},
+    )
+    r.raise_for_status()
+    works = []
+    for it in r.json().get("message", {}).get("items", []):
+        doi = it.get("DOI")
+        if not doi:
+            continue
+        year = ((it.get("issued") or {}).get("date-parts") or [[None]])[0][0]
+        works.append(
+            {
+                "id": f"https://doi.org/{doi}",
+                "display_name": (it.get("title") or [""])[0],
+                "publication_year": year,
+                "doi": f"https://doi.org/{doi}",
+                "_abstract": re.sub(r"<[^>]+>", " ", it.get("abstract") or ""),
+            }
+        )
+    return works
+
+
+async def _research(client, sem, name: str) -> tuple[list, bool]:
+    """([[work, term, studied], ...], whether the main index answered) for one place name."""
+    anchor = word(name)
+    found: dict[tuple[str, str], tuple[dict, str, bool]] = {}
+
+    def keep(work: dict, term: str, studied: bool):
+        text = f"{work.get('display_name') or ''} {abstract(work)}"
+        # The place must be in the title or abstract, not only an author or reference.
+        if relevant(work.get("display_name") or "") and anchor.search(text):
+            k = (TERMS[term], work["id"])
+            if k not in found or (studied and not found[k][2]):
+                slim = {x: work.get(x) for x in ("id", "display_name", "publication_year", "doi")}
+                found[k] = (slim, term, studied)
+
+    def scan(works):
+        for work in works:
+            text = f"{work.get('display_name') or ''} {abstract(work)}"
+            for term in TERMS:
+                if word(term).search(text):
+                    keep(work, term, True)
+
+    try:
+        # One search for the place; minerals in titles and abstracts count as studied.
+        scan(await _search(client, sem, f'"{name}"', 50))
+        # With a key, also search full texts mineral by mineral for passing mentions.
+        if os.getenv("OPENALEX_API_KEY"):
+            hits = await asyncio.gather(
+                *(_search(client, sem, f'"{name}" {term}', 10) for term in TERMS),
+                return_exceptions=True,
+            )
+            for term, works in zip(TERMS, hits):
+                if isinstance(works, Exception):
+                    continue
+                for work in works:
+                    text = f"{work.get('display_name') or ''} {abstract(work)}"
+                    keep(work, term, bool(word(term).search(text)))
+    except Limited:
+        scan(await _crossref(client, name))
+        return [[w, t, st] for w, t, st in found.values()], False
+    return [[w, t, st] for w, t, st in found.values()], True
+
+
 class LiteratureProvider:
     source = OPENALEX
 
     async def fetch(
         self, client: httpx.AsyncClient, location: Point, radius_km: float
     ) -> ProviderResult:
-        name = await place_name(client, location)
-        if len(name) < 3:
+        names = await place_names(client, location)
+        if not names:
             return ProviderResult(
                 source=self.source,
                 status="empty",
                 message="No place name here to search published research for.",
             )
-        key = name.lower()
-        if key in _cache and _cache[key][0] > time.monotonic() - CACHE_SECONDS:
-            _, evidence, msg = _cache[key]
-            return ProviderResult(
-                source=self.source,
-                status="available" if evidence else "empty",
-                evidence=evidence,
-                message=msg,
-                layers={"place": [name]},
-            )
+        _load_cache()
         sem = asyncio.Semaphore(4)
-        anchor = word(name)
-        found: dict[tuple[str, str], tuple[dict, bool]] = {}
-
-        def keep(work: dict, term: str, studied: bool):
-            text = f"{work.get('display_name') or ''} {abstract(work)}"
-            # The place must be in the title or abstract, not only an author or reference.
-            if relevant(work.get("display_name") or "") and anchor.search(text):
-                k = (TERMS[term], work["id"])
-                if k not in found or (studied and not found[k][1]):
-                    found[k] = (work, studied)
-
-        try:
-            # One search for the place; minerals in titles and abstracts count as studied.
-            for work in await _search(client, sem, f'"{name}"', 50):
-                text = f"{work.get('display_name') or ''} {abstract(work)}"
-                for term in TERMS:
-                    if word(term).search(text):
-                        keep(work, term, True)
-            # With a key, also search full texts mineral by mineral for passing mentions.
-            if os.getenv("OPENALEX_API_KEY"):
-                hits = await asyncio.gather(
-                    *(_search(client, sem, f'"{name}" {term}', 10) for term in TERMS),
-                    return_exceptions=True,
-                )
-                for term, works in zip(TERMS, hits):
-                    if isinstance(works, Limited):
-                        raise works
-                    if isinstance(works, Exception):
-                        continue
-                    for work in works:
-                        text = f"{work.get('display_name') or ''} {abstract(work)}"
-                        keep(work, term, bool(word(term).search(text)))
-        except Limited:
+        hits_by_name: dict[str, list] = {}
+        failed = 0
+        for name in names:
+            key = name.lower()
+            if key in _cache and _cache[key][0] > time.time() - CACHE_SECONDS:
+                hits_by_name[name] = _cache[key][1]
+                continue
+            try:
+                hits_by_name[name], full = await _research(client, sem, name)
+            except (httpx.HTTPError, ValueError):
+                failed += 1
+                continue
+            # Backup-only answers are retried after six hours, once the main index resets.
+            stamp = time.time() if full else time.time() - CACHE_SECONDS + 6 * 3600
+            _cache[key] = (stamp, hits_by_name[name])
+        _save_cache()
+        if failed == len(names):
             return ProviderResult(
                 source=self.source,
                 status="unavailable",
-                message="The free daily research allowance is used up. It resets at midnight UTC.",
-                layers={"place": [name]},
+                message="Research libraries could not be reached. Try again later.",
+                layers={"place": names[:1]},
             )
-        evidence = []
+        # The most local name wins; a paper is used once per mineral.
+        evidence, seen = [], set()
         per_mineral: dict[str, int] = {}
-        for (commodity, _), (w, studied) in sorted(
-            found.items(), key=lambda kv: (not kv[1][1], -(kv[1][0].get("publication_year") or 0))
-        ):
-            if per_mineral.get(commodity, 0) >= 3:
-                continue
-            per_mineral[commodity] = per_mineral.get(commodity, 0) + 1
-            title = (w.get("display_name") or "Untitled").strip()
-            year = w.get("publication_year")
-            evidence.append(
-                Evidence(
-                    id=f"openalex:{w['id'].rsplit('/', 1)[-1]}:{commodity}",
-                    source_id=self.source.id,
-                    feature_id=w["id"],
-                    evidence_type="literature",
-                    commodity=commodity,
-                    direction="positive",
-                    observed_or_inferred="reported",
-                    reliability="Published mention; location is the named place, not a point",
-                    strength="moderate" if studied else "weak",
-                    description=(
-                        f"“{title}” ({year}) "
-                        + ("studies" if studied else "mentions")
-                        + f" {commodity.lower()} at {name}."
-                    ),
-                    raw_value={
-                        "title": title,
-                        "year": year,
-                        "url": w.get("doi") or w["id"],
-                        "place": name,
-                        "studied": studied,
-                    },
-                )
+        for name in names:
+            rows = sorted(
+                hits_by_name.get(name, []),
+                key=lambda h: (not h[2], -(h[0].get("publication_year") or 0)),
             )
-        msg = f"Searched published geology research for {name}."
-        _cache[key] = (time.monotonic(), evidence, msg)
+            for w, term, studied in rows:
+                commodity = TERMS[term]
+                if (commodity, w["id"]) in seen or per_mineral.get(commodity, 0) >= 3:
+                    continue
+                seen.add((commodity, w["id"]))
+                per_mineral[commodity] = per_mineral.get(commodity, 0) + 1
+                title = (w.get("display_name") or "Untitled").strip()
+                year = w.get("publication_year")
+                evidence.append(
+                    Evidence(
+                        id=f"openalex:{w['id'].rsplit('/', 1)[-1]}:{commodity}",
+                        source_id=self.source.id,
+                        feature_id=w["id"],
+                        evidence_type="literature",
+                        commodity=commodity,
+                        direction="positive",
+                        observed_or_inferred="reported",
+                        reliability="Published mention; location is the named place, not a point",
+                        strength="moderate" if studied else "weak",
+                        description=(
+                            f"“{title}” ({year}) "
+                            + ("studies" if studied else "mentions")
+                            + f" {commodity.lower()} at {name}."
+                        ),
+                        raw_value={
+                            "title": title,
+                            "year": year,
+                            "url": w.get("doi") or w["id"],
+                            "place": name,
+                            "studied": studied,
+                        },
+                    )
+                )
         return ProviderResult(
             source=self.source,
             status="available" if evidence else "empty",
             evidence=evidence,
-            message=msg,
-            layers={"place": [name]},
+            message=f"Searched published geology research for {', '.join(names)}.",
+            layers={"place": names[:1]},
         )
