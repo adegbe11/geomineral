@@ -6,7 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { MapPin, Search, X } from "lucide-react-native";
+import { MapPin, Search } from "lucide-react-native";
 import type { Location } from "../types";
 import { api } from "../services/api";
 import { colors, ui } from "../theme";

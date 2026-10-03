@@ -12,36 +12,19 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import {
-  BookOpen,
-  Camera,
-  Compass,
-  Folder,
-  Home,
-  Map,
-  UserRound,
-  X,
-} from "lucide-react-native";
-import {
-  Brand,
-  Button,
-  Empty,
-  Header,
-  MineralArt,
-  Notice,
-} from "./components/Primitives";
-import PlaceSearch from "./components/PlaceSearch";
+import { Camera, Compass, Folder, Home, UserRound, X } from "lucide-react-native";
+import { Brand, Button, Header } from "./components/Primitives";
 import { WorkspaceProvider, useWorkspace } from "./state/Workspace";
-import { api, authenticate, coordinates, post, signOut } from "./services/api";
+import { api, authenticate, post, signOut } from "./services/api";
 import { colors, ui } from "./theme";
-import type { Project } from "./types";
+import type { Location, Project } from "./types";
+import { Profile, ProjectDetail, ProjectsList } from "./ProjectScreens";
 import { Scanner } from "./ScanScreen";
 import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
 function Shell() {
@@ -91,9 +74,10 @@ function Shell() {
         .finally(() => setBusy(false));
     } else if (!w.user) setProjects([]);
   }, [w.user, w.tab, saving]);
-  const analyze = () => {
+  const analyze = (point?: Location) => {
+    if (point) w.selectLocation(point);
     setRoute("analysis");
-    void w.analyze();
+    void w.analyze(point);
   };
   const save = () => {
     if (!w.user) {
@@ -208,186 +192,66 @@ function Shell() {
           }}
         />
       ) : route === "project" && project ? (
-        <>
-          <Header title={project.name} back={back} />
-          <ScrollView contentContainerStyle={ui.content}>
-            <View style={ui.card}>
-              <Text style={ui.h2}>{project.location.name}</Text>
-              <Text style={ui.body}>{coordinates(project.location)}</Text>
-              <Text style={ui.small}>
-                Private project • {project.records?.length || 0} field records
-              </Text>
-            </View>
-            <Button
-              title="Explore this location"
-              onPress={() => {
-                w.selectLocation(project.location);
-                back();
-                w.setTab("Explore");
-              }}
-            />
-            <Text style={ui.h2}>Field records</Text>
-            {project.records?.map((r) => (
-              <View style={ui.card} key={r.id}>
-                <Text style={ui.h3}>{r.title}</Text>
-                {!!r.photos?.length && (
-                  <ScrollView horizontal>
-                    {r.photos.map((photo, i) => (
-                      <Image
-                        key={i}
-                        accessibilityLabel={`Sample photo ${i + 1}`}
-                        source={{ uri: photo }}
-                        style={{
-                          width: 160,
-                          height: 160,
-                          borderRadius: 16,
-                          marginRight: 8,
-                        }}
-                      />
-                    ))}
-                  </ScrollView>
-                )}
-                {!!r.rock_type && r.rock_type !== "Unidentified" && (
-                  <Button
-                    outline
-                    title={`About ${r.rock_type}`}
-                    onPress={() => openGuide(r.rock_type!)}
-                  />
-                )}
-                <Text style={ui.body}>{r.description}</Text>
-                <Text style={ui.small}>
-                  {r.kind} • {coordinates(r.location)}
-                </Text>
-              </View>
-            ))}
-            {!project.records?.length && (
-              <Empty title="No samples yet" description="" />
-            )}
-          </ScrollView>
-        </>
+        <ProjectDetail
+          project={project}
+          setProject={setProject}
+          back={back}
+          guide={openGuide}
+          analyze={() => analyze(project.location)}
+          deleted={() => {
+            setProjects((old) => old.filter((p) => p.id !== project.id));
+            setProject(null);
+            back();
+          }}
+        />
       ) : w.tab === "Home" ? (
-        <HomeScreen analyze={analyze} guide={openGuide} />
+        <HomeScreen
+          analyze={() => analyze()}
+          guide={openGuide}
+          openRecent={(id) => {
+            w.openRecent(id);
+            setRoute("analysis");
+          }}
+        />
       ) : w.tab === "Explore" ? (
         <Explore
-          analyze={analyze}
+          analyze={() => analyze()}
           save={save}
           results={() => setRoute("analysis")}
         />
       ) : w.tab === "Scan" ? (
         <Scanner signIn={() => setAuth(true)} guide={openGuide} />
       ) : w.tab === "Projects" ? (
-        <>
-          <Header
-            title="My Projects"
-            right={
-              <Pressable accessibilityLabel="Create project" onPress={save}>
-                <Text style={{ fontSize: 28, color: colors.green }}>+</Text>
-              </Pressable>
+        <ProjectsList
+          projects={projects}
+          busy={busy}
+          error={error}
+          signIn={() => setAuth(true)}
+          create={save}
+          open={async (p) => {
+            setError("");
+            try {
+              setProject(await api<Project>(`/projects/${p.id}`));
+              setRoute("project");
+            } catch (e) {
+              setError((e as Error).message);
             }
-          />
-          <ScrollView contentContainerStyle={ui.content}>
-            <View style={styles.segment}>
-              <Text style={{ color: colors.green, fontWeight: "600" }}>
-                My workspace
-              </Text>
-              <Text style={ui.small}>Private</Text>
-            </View>
-            {!!error && <Text style={ui.error}>{error}</Text>}
-            {busy && <ActivityIndicator color={colors.green} />}
-            {!w.user ? (
-              <Empty title="Your projects" description="Sign in to sync.">
-                <Button title="Sign In" onPress={() => setAuth(true)} />
-              </Empty>
-            ) : !projects.length ? (
-              <Empty title="No projects yet" description="">
-                <Button title="Create Project" onPress={save} />
-              </Empty>
-            ) : (
-              projects.map((p) => (
-                <Pressable
-                  key={p.id}
-                  style={[ui.card, ui.row]}
-                  onPress={async () => {
-                    setError("");
-                    try {
-                      setProject(await api<Project>(`/projects/${p.id}`));
-                      setRoute("project");
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  <View style={styles.projectArt}>
-                    <Map size={38} color="#B4CA98" />
-                  </View>
-                  <View style={{ flex: 1, gap: 8 }}>
-                    <Text style={ui.h3}>{p.name}</Text>
-                    <Text style={ui.small}>{p.location.name}</Text>
-                    <Text style={{ fontSize: 11, color: colors.green }}>→</Text>
-                  </View>
-                </Pressable>
-              ))
-            )}
-          </ScrollView>
-        </>
+          }}
+        />
       ) : (
-        <>
-          <Header title="Profile" />
-          <ScrollView contentContainerStyle={ui.content}>
-            <View style={[ui.card, { alignItems: "center", padding: 28 }]}>
-              <View style={styles.avatar}>
-                <UserRound color={colors.green} />
-              </View>
-              <Text style={ui.h2}>{w.user ? "Account" : "Guest"}</Text>
-              <Text style={ui.body}>{w.user?.email || ""}</Text>
-              {!w.user && (
-                <Button
-                  title="Sign In / Create Account"
-                  onPress={() => setAuth(true)}
-                />
-              )}
-            </View>
-            <View style={[ui.card, ui.between]}>
-              <View>
-                <Text style={ui.h3}>Professional detail</Text>
-                <Text style={ui.small}>Sources and evidence IDs</Text>
-              </View>
-              <Switch
-                accessibilityLabel="Professional detail"
-                value={w.professional}
-                onValueChange={w.setProfessional}
-                trackColor={{ true: colors.green }}
-              />
-            </View>
-            <View style={ui.card}>
-              <Brand />
-
-              <Text style={ui.small}>
-                Live coverage varies by region. This tool does not establish
-                reserves, grade, land access or legal rights.
-              </Text>
-              <Text style={ui.small}>
-                Earth image: NASA / JPL. Mineral illustrations are illustrative.
-              </Text>
-            </View>
-            {!!error && <Text style={ui.error}>{error}</Text>}
-            {w.user && (
-              <Button
-                outline
-                title="Sign Out"
-                onPress={async () => {
-                  try {
-                    await signOut();
-                    w.clearPrivateState();
-                    setProject(null);
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
-                }}
-              />
-            )}
-          </ScrollView>
-        </>
+        <Profile
+          error={error}
+          signIn={() => setAuth(true)}
+          signOut={async () => {
+            try {
+              await signOut();
+              w.clearPrivateState();
+              setProject(null);
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}
+        />
       )}
       {w.welcomed && !route && (
         <View style={styles.nav}>
@@ -567,38 +431,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 30 },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.pale,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  tile: {
-    width: "48%",
-    flexGrow: 1,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 13,
-    minHeight: 104,
-  },
-  tileLabel: { fontSize: 12, fontWeight: "600", color: colors.ink },
-  mineral: {
-    flex: 1,
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-  },
   nav: {
     position: "absolute",
     bottom: 12,
@@ -619,21 +451,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
     minHeight: 54,
-  },
-  segment: {
-    backgroundColor: "#EDF1ED",
-    borderRadius: 12,
-    padding: 15,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  projectArt: {
-    backgroundColor: "#315840",
-    width: 78,
-    height: 98,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
   },
 });

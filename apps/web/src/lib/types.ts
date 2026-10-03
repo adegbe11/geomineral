@@ -113,5 +113,6 @@ export type Project = {
   analysis_id?: string;
   polygon?: number[][];
   area_m2?: number;
+  record_count?: number;
   records?: FieldRecord[];
 };

@@ -12,8 +12,8 @@ from uuid import uuid4
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 
@@ -50,7 +50,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=config.ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization", "X-Guest-Token"],
 )
 requests: dict[str, deque] = defaultdict(deque)
@@ -347,22 +347,74 @@ def owned_project(project_id: str, user: User, db: DBSession) -> Project:
 
 def project_dict(project: Project):
     return {
+        **json.loads(project.payload),
         "id": project.id,
         "name": project.name,
         "created_at": project.created_at,
         "visibility": "Private",
-        **json.loads(project.payload),
     }
 
 
 @app.get("/api/projects")
 def projects(user: User = Depends(require_user), db: DBSession = Depends(get_db)):
-    return [
-        project_dict(p)
-        for p in db.scalars(
+    owned = list(
+        db.scalars(
             select(Project).where(Project.owner_id == user.id).order_by(Project.created_at.desc())
         )
-    ]
+    )
+    counts = dict(
+        db.execute(
+            select(FieldRecord.project_id, func.count())
+            .where(FieldRecord.project_id.in_([p.id for p in owned]))
+            .group_by(FieldRecord.project_id)
+        ).all()
+    )
+    return [{**project_dict(p), "record_count": counts.get(p.id, 0)} for p in owned]
+
+
+class ProjectRename(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+@app.patch("/api/projects/{project_id}")
+def rename_project(
+    project_id: str,
+    body: ProjectRename,
+    user: User = Depends(require_user),
+    db: DBSession = Depends(get_db),
+):
+    project = owned_project(project_id, user, db)
+    project.name = body.name.strip()
+    db.commit()
+    return project_dict(project)
+
+
+@app.delete("/api/projects/{project_id}", status_code=204)
+def delete_project(
+    project_id: str, user: User = Depends(require_user), db: DBSession = Depends(get_db)
+):
+    project = owned_project(project_id, user, db)
+    for record in db.scalars(select(FieldRecord).where(FieldRecord.project_id == project.id)):
+        db.delete(record)
+    db.delete(project)
+    db.commit()
+    return Response(status_code=204)
+
+
+@app.delete("/api/projects/{project_id}/records/{record_id}", status_code=204)
+def delete_record(
+    project_id: str,
+    record_id: str,
+    user: User = Depends(require_user),
+    db: DBSession = Depends(get_db),
+):
+    owned_project(project_id, user, db)
+    record = db.get(FieldRecord, record_id)
+    if not record or record.project_id != project_id:
+        raise HTTPException(404, "Record not found")
+    db.delete(record)
+    db.commit()
+    return Response(status_code=204)
 
 
 @app.post("/api/projects", status_code=201)

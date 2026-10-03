@@ -42,6 +42,7 @@ function useWorkspaceState() {
   const [recent, setRecent] = useState<
     { id: string; location: Location; result: Analysis }[]
   >([]);
+  const pendingName = useRef<Location | null>(null);
   const generation = useRef(0),
     timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -77,15 +78,16 @@ function useWorkspaceState() {
     setStatus("");
     setError("");
     if (UNNAMED.test(point.name)) {
-      const version = generation.current;
       api<Location>(`/reverse?lat=${point.lat}&lng=${point.lng}`)
         .then((place) => {
-          if (generation.current === version && !UNNAMED.test(place.name))
-            setLocation((old) =>
-              old.lat === point.lat && old.lng === point.lng
-                ? { ...old, name: place.name, country_code: place.country_code }
-                : old,
-            );
+          if (UNNAMED.test(place.name)) return;
+          // Same point only; an analysis started meanwhile keeps its result.
+          const same = (l: Location) => l.lat === point.lat && l.lng === point.lng;
+          const named = (l: Location) =>
+            same(l) ? { ...l, name: place.name, country_code: place.country_code } : l;
+          setLocation(named);
+          setRecent((old) => old.map((r) => ({ ...r, location: named(r.location) })));
+          pendingName.current = same(point) ? place : null;
         })
         .catch(() => {});
     }
@@ -94,7 +96,7 @@ function useWorkspaceState() {
     setWelcomed(true);
     await setStored("gm-welcomed", "yes");
   }
-  async function analyze() {
+  async function analyze(point: Location = location) {
     const version = ++generation.current;
     setStatus("queued");
     setError("");
@@ -103,7 +105,7 @@ function useWorkspaceState() {
       await ensureGuest();
       const run = await api<Run>("/analyses", {
         method: "POST",
-        body: JSON.stringify({ location, radius_km: radius }),
+        body: JSON.stringify({ location: point, radius_km: radius }),
       });
       if (generation.current !== version) return;
       setRunId(run.id);
@@ -115,8 +117,17 @@ function useWorkspaceState() {
           setStatus(next.status);
           if (next.status === "complete" && next.result) {
             setAnalysis(next.result);
+            const named =
+              pendingName.current &&
+              pendingName.current.lat === point.lat &&
+              pendingName.current.lng === point.lng
+                ? { ...point, name: pendingName.current.name }
+                : point;
             setRecent((old) =>
-              [{ id: run.id, location, result: next.result! }, ...old].slice(
+              [
+                { id: run.id, location: named, result: next.result! },
+                ...old.filter((r) => r.location.lat !== point.lat || r.location.lng !== point.lng),
+              ].slice(
                 0,
                 8,
               ),
@@ -144,6 +155,18 @@ function useWorkspaceState() {
         setStatus("failed");
       }
     }
+  }
+  function openRecent(id: string) {
+    const found = recent.find((r) => r.id === id);
+    if (!found) return;
+    generation.current++;
+    if (timer.current) clearTimeout(timer.current);
+    setLocation(found.location);
+    setPolygon([]);
+    setAnalysis(found.result);
+    setRunId(found.id);
+    setStatus("complete");
+    setError("");
   }
   function clearPrivateState() {
     generation.current++;
@@ -188,6 +211,7 @@ function useWorkspaceState() {
     error,
     analyze,
     recent,
+    openRecent,
     clearPrivateState,
   };
 }

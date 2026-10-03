@@ -237,7 +237,37 @@ test("mining district shows rating, sites on the map and a full report", async (
   const bytes = await readFile("test-results/Kalgoorlie-Report.pdf");
   expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
   expect(bytes.length).toBeGreaterThan(8000);
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("tab", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: /Open analysis of Kalgoorlie/ }).click();
+  await expect(page.getByText("Location Analysis", { exact: true })).toBeVisible();
+  await expect(page.getByText("Gold", { exact: true }).first()).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("projects can be renamed and deleted", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.getByRole("button", { name: "New here? Create Account" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(`projects-${Date.now()}@example.test`);
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-native-test-only-passphrase");
+  await page.getByRole("button", { name: "Create Account", exact: true }).click();
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  await page.getByLabel("Project name", { exact: true }).fill("Ridge survey");
+  await page.getByRole("button", { name: "Save Project", exact: true }).click();
+  await expect(page.getByText("0 samples", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Ridge survey" }).click();
+  await page.getByRole("button", { name: "Rename project" }).click();
+  await page.getByLabel("Project name", { exact: true }).fill("North ridge");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("North ridge", { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/project.png" });
+  await page.getByRole("button", { name: "Delete project" }).click();
+  await page.getByRole("button", { name: "Delete project" }).click();
+  await expect(page.getByText("No projects yet", { exact: true })).toBeVisible();
 });
 
 test("mineral guide covers rocks and links look-alikes", async ({ page }) => {

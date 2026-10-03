@@ -312,3 +312,31 @@ def test_reverse_geocode_short_name_and_fallback(clients, monkeypatch):
     monkeypatch.setattr(main.httpx, "AsyncClient", fake({"error": "Unable to geocode"}))
     ocean = a.get("/api/reverse", params={"lat": 0, "lng": -140}).json()
     assert ocean["name"] == "0.00000, -140.00000"
+
+
+def test_project_rename_delete_and_counts_are_owner_only(clients):
+    a, b, _ = clients
+    register(a, "owner@example.test")
+    register(b, "other@example.test")
+    project = a.post(
+        "/api/projects", json={"name": "Ridge", "location": {"lat": 1, "lng": 2}}
+    ).json()
+    record = a.post(
+        f"/api/projects/{project['id']}/records",
+        json={
+            "kind": "observation",
+            "title": "Outcrop",
+            "description": "Quartz vein",
+            "location": {"lat": 1, "lng": 2},
+        },
+    ).json()
+    assert a.get("/api/projects").json()[0]["record_count"] == 1
+    assert b.patch(f"/api/projects/{project['id']}", json={"name": "Taken"}).status_code == 404
+    assert b.delete(f"/api/projects/{project['id']}").status_code == 404
+    renamed = a.patch(f"/api/projects/{project['id']}", json={"name": " North ridge "})
+    assert renamed.json()["name"] == "North ridge"
+    assert b.delete(f"/api/projects/{project['id']}/records/{record['id']}").status_code == 404
+    assert a.delete(f"/api/projects/{project['id']}/records/{record['id']}").status_code == 204
+    assert a.get("/api/projects").json()[0]["record_count"] == 0
+    assert a.delete(f"/api/projects/{project['id']}").status_code == 204
+    assert a.get("/api/projects").json() == []

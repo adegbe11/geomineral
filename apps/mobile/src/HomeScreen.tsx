@@ -8,20 +8,20 @@ import {
   Compass,
   Folder,
   MapPin,
-  Sparkles,
   UserRound,
 } from "lucide-react-native";
 import Svg, { Path, Circle } from "react-native-svg";
 import { Brand, Button, MineralArt } from "./components/Primitives";
 import { minerals } from "./minerals";
-
-const FEATURED = ["Gold", "Pyrite", "Quartz", "Malachite", "Amethyst", "Galena"].map(
-  (name) => minerals.find((x) => x.name === name)!,
-);
 import PlaceSearch from "./components/PlaceSearch";
 import { useWorkspace } from "./state/Workspace";
 import { colors, ui } from "./theme";
 import OrbitingEarth from "./components/OrbitingEarth";
+import { RatingPill } from "./ExploreScreens";
+
+const FEATURED = ["Gold", "Pyrite", "Quartz", "Malachite", "Amethyst", "Galena"].map(
+  (name) => minerals.find((x) => x.name === name)!,
+);
 export function Terrain({ color = "#CFDFC5" }: { color?: string }) {
   return (
     <Svg
@@ -48,9 +48,11 @@ export function Terrain({ color = "#CFDFC5" }: { color?: string }) {
 export default function HomeScreen({
   analyze,
   guide,
+  openRecent,
 }: {
   analyze: () => void;
   guide: (name?: string) => void;
+  openRecent: (id: string) => void;
 }) {
   const w = useWorkspace();
   return (
@@ -96,6 +98,39 @@ export default function HomeScreen({
           </View>
           <Button title="Analyze Location" onPress={analyze} />
         </View>
+        {w.recent.length > 0 && (
+          <View style={{ gap: 10 }}>
+            <Text style={s.heading}>Recent</Text>
+            {w.recent.slice(0, 3).map((r) => {
+              const top = r.result.assessments.find(
+                (a) => a.prospectivity !== "Insufficient evidence",
+              );
+              return (
+                <Pressable
+                  key={r.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open analysis of ${r.location.name}`}
+                  onPress={() => openRecent(r.id)}
+                  style={[ui.card, ui.between, { padding: 16 }]}
+                >
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Text style={ui.h3} numberOfLines={1}>
+                      {r.location.name}
+                    </Text>
+                    <View style={[ui.row, { gap: 8 }]}>
+                      <RatingPill rating={top?.prospectivity ?? r.result.rating} />
+                      <Text style={ui.small}>
+                        {top ? top.commodity : "No clear signal"} ·{" "}
+                        {r.result.occurrences.length} sites
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={18} color={colors.muted} />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
         <View style={[ui.between, { marginTop: 5 }]}>
           <Text style={s.heading}>Your field tools</Text>
         </View>

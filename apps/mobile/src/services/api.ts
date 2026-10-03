@@ -67,7 +67,7 @@ export async function api<T>(
     } catch {}
     throw new Error(message);
   }
-  return response.json();
+  return response.status === 204 ? (undefined as T) : response.json();
 }
 export const post = <T>(path: string, body: unknown) =>
   api<T>(path, { method: "POST", body: JSON.stringify(body) });
