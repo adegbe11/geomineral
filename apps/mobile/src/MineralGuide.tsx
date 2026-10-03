@@ -17,7 +17,7 @@ import {
 import { fluorescence, magnetism } from "./identify";
 import { FadeIn, Float, haptic, Pressy } from "./motion";
 import { useWorkspace } from "./state/Workspace";
-import { api, post } from "./services/api";
+import { projectsWithCache, saveRecord } from "./services/outbox";
 import { type, useTheme } from "./theme";
 import type { Project } from "./types";
 
@@ -57,12 +57,12 @@ export default function MineralGuide({
     [reference, setReference] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [saved, setSaved] = useState(false);
+    [saved, setSaved] = useState<"" | "online" | "offline">("");
   function choose(x: Mineral) {
     setSelected(x);
     setProjects(null);
     setError("");
-    setSaved(false);
+    setSaved("");
     setTitle(`${x.name} field sample`);
     setNotes("");
     setConfirmed(false);
@@ -76,7 +76,7 @@ export default function MineralGuide({
     setBusy(true);
     setError("");
     try {
-      setProjects(await api<Project[]>("/projects"));
+      setProjects(await projectsWithCache());
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -88,7 +88,7 @@ export default function MineralGuide({
     setBusy(true);
     setError("");
     try {
-      await post(`/projects/${p.id}/records`, {
+      const { queued } = await saveRecord(p, {
         kind: "sample",
         title: title.trim(),
         description: `${confirmed ? "Lab-confirmed (user reported)" : "Suspected; not confirmed"} mineral: ${selected.name}. ${notes.trim() || "No additional observations recorded."}${confirmed ? ` Laboratory reference: ${reference.trim()}.` : ""}`,
@@ -97,8 +97,9 @@ export default function MineralGuide({
         method: confirmed ? "Lab-confirmed (user reported)" : "Suspected visual identification",
         chain_of_custody: confirmed ? reference.trim() : "Not recorded",
       });
-      setSaved(true);
+      setSaved(queued ? "offline" : "online");
       setProjects(null);
+      w.refreshPending();
       haptic.success();
     } catch (e) {
       setError((e as Error).message);
@@ -318,7 +319,9 @@ export default function MineralGuide({
               />
             </View>
             {saved ? (
-              <Text style={[ui.h3, { color: c.tint, textAlign: "center" }]}>Saved.</Text>
+              <Text style={[ui.h3, { color: c.tint, textAlign: "center" }]}>
+                {saved === "offline" ? "Saved offline. Syncs when you're back online." : "Saved."}
+              </Text>
             ) : (
               <Button title="Add Sample" busy={busy} onPress={prepare} />
             )}

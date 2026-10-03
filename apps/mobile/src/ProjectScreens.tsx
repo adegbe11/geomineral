@@ -11,8 +11,9 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Camera, ChevronRight, FolderOpen, Pencil, Plus, Trash2, UserRound } from "lucide-react-native";
+import { Camera, ChevronRight, CloudUpload, FolderOpen, Pencil, Plus, Trash2, UserRound } from "lucide-react-native";
 import NativeMap from "./components/NativeMap";
+import { VoicePlayer } from "./components/VoiceNote";
 import MineralArt from "./components/MineralArt";
 import { Brand, Button, Empty, Header, Row } from "./components/Primitives";
 import { findMineral } from "./minerals";
@@ -83,6 +84,22 @@ export function ProjectsList({
       />
       <ScrollView contentContainerStyle={ui.content}>
         <Segmented items={["Projects", "Rockdex"] as const} value={view} onChange={setView} />
+        {w.pendingCount > 0 && (
+          <FadeIn>
+            <Pressy
+              accessibilityRole="button"
+              accessibilityLabel="Sync now"
+              onPress={() => void w.sync()}
+              style={[ui.row, { gap: 10, padding: 12, borderRadius: 16, backgroundColor: c.tintSoft }]}
+            >
+              <CloudUpload size={18} color={c.tint} />
+              <Text style={{ ...type.subhead, fontWeight: "600", color: c.tint, flex: 1 }}>
+                {w.pendingCount} {w.pendingCount === 1 ? "sample" : "samples"} waiting to sync
+              </Text>
+              <Text style={{ ...type.footnote, color: c.tint }}>Sync</Text>
+            </Pressy>
+          </FadeIn>
+        )}
         {view === "Rockdex" ? (
           <Rockdex open={guide} signIn={signIn} />
         ) : (
@@ -287,6 +304,7 @@ export function ProjectDetail({
                     <ChevronRight size={14} color={c.secondary} />
                   </Pressy>
                 )}
+                {!!r.audio && <VoicePlayer uri={r.audio} />}
                 <Text style={ui.body}>{r.description}</Text>
                 <Pressable
                   accessibilityRole="button"

@@ -79,7 +79,7 @@ export default function HomeScreen({
         </View>
         <FadeIn delay={80} style={{ paddingHorizontal: 20, paddingTop: 44 }}>
           <Text style={{ ...type.largeTitle, color: "#fff" }}>
-            Explore what lies{"\n"}beneath you.
+            Find hidden minerals{"\n"}around you.
           </Text>
         </FadeIn>
       </View>

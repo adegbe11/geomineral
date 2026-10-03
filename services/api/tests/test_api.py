@@ -366,3 +366,29 @@ def test_records_across_projects_are_private_and_photo_free(clients):
     assert all(r["photo_count"] == 1 and "photos" not in r for r in records)
     assert b.get("/api/records").json() == []
     assert a.get("/api/records", headers={"Authorization": ""}).status_code == 200
+
+
+def test_voice_note_is_stored_and_validated(clients):
+    a, _, _ = clients
+    register(a, "voice@example.test")
+    project = a.post(
+        "/api/projects", json={"name": "Voice", "location": {"lat": 1, "lng": 2}}
+    ).json()
+    base = {
+        "kind": "observation",
+        "description": "Spoken note",
+        "location": {"lat": 1, "lng": 2},
+    }
+    audio = "data:audio/mp4;base64,AAAAGGZ0eXBNNEEg"
+    ok = a.post(
+        f"/api/projects/{project['id']}/records", json={**base, "title": "Note", "audio": audio}
+    )
+    assert ok.status_code == 201
+    bad = a.post(
+        f"/api/projects/{project['id']}/records",
+        json={**base, "title": "Bad", "audio": "data:text/html;base64,PHNjcmlwdD4="},
+    )
+    assert bad.status_code == 422
+    detail = a.get(f"/api/projects/{project['id']}").json()
+    assert detail["records"][0]["audio"] == audio
+    assert "audio" not in a.get("/api/records").json()[0]

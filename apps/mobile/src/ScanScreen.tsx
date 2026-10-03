@@ -15,14 +15,17 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
-import { Check, ImagePlus, ScanLine, Sparkles } from "lucide-react-native";
+import { Check, ImagePlus, MapPin, ScanLine, Sparkles } from "lucide-react-native";
 import { Button, Header, MineralArt } from "./components/Primitives";
 import { findMineral, pretty, searchMinerals } from "./minerals";
 import { FadeIn, haptic, Pressy, useReduceMotion } from "./motion";
-import { api, ensureGuest, post } from "./services/api";
+import * as LocationService from "expo-location";
+import VoiceNote from "./components/VoiceNote";
+import { api, coordinates, ensureGuest } from "./services/api";
+import { projectsWithCache, saveRecord } from "./services/outbox";
 import { useWorkspace } from "./state/Workspace";
 import { type, useTheme } from "./theme";
-import type { Project, ScanResult } from "./types";
+import type { Location, Project, ScanResult } from "./types";
 
 const native = Platform.OS !== "web";
 
@@ -156,7 +159,29 @@ export function Scanner({
     [suspected, setSuspected] = useState(""),
     [projects, setProjects] = useState<Project[]>([]),
     [pick, setPick] = useState(false),
-    [saved, setSaved] = useState(false);
+    [saved, setSaved] = useState<"" | "online" | "offline">(""),
+    [audio, setAudio] = useState<string | null>(null),
+    [gps, setGps] = useState<Location | null>(null),
+    [locating, setLocating] = useState(false);
+  async function pinGps() {
+    setLocating(true);
+    setError("");
+    try {
+      const permission = await LocationService.requestForegroundPermissionsAsync();
+      if (!permission.granted) throw new Error("Location is off.");
+      const p = await LocationService.getCurrentPositionAsync({ accuracy: LocationService.Accuracy.High });
+      haptic.success();
+      setGps({
+        lat: p.coords.latitude,
+        lng: p.coords.longitude,
+        name: `GPS ±${Math.round(p.coords.accuracy ?? 0)} m`,
+      });
+    } catch (e) {
+      setError((e as Error).message || "Could not get your position.");
+    } finally {
+      setLocating(false);
+    }
+  }
   useEffect(() => {
     api<{ available: boolean; provider: string }>("/scan/status")
       .then(setVision)
@@ -170,7 +195,7 @@ export function Scanner({
   function fresh(next: string[]) {
     setPhotos(next);
     w.setScanResult(null);
-    setSaved(false);
+    setSaved("");
   }
   async function capture() {
     setBusy(true);
@@ -219,7 +244,7 @@ export function Scanner({
         signal: AbortSignal.timeout(300000),
       });
       w.setScanResult(found);
-      setSaved(false);
+      setSaved("");
       if (found.candidates?.length) haptic.success();
       else haptic.warning();
     } catch (e) {
@@ -237,7 +262,7 @@ export function Scanner({
     setBusy(true);
     setError("");
     try {
-      setProjects(await api<Project[]>("/projects"));
+      setProjects(await projectsWithCache());
       setPick(true);
     } catch (e) {
       setError((e as Error).message);
@@ -248,7 +273,7 @@ export function Scanner({
   async function record(p: Project) {
     setBusy(true);
     try {
-      await post(`/projects/${p.id}/records`, {
+      const { queued } = await saveRecord(p, {
         kind: "sample",
         title,
         description:
@@ -260,7 +285,7 @@ export function Scanner({
           ]
             .filter(Boolean)
             .join("\n") || "Visual field observation; identification not confirmed.",
-        location: w.location,
+        location: gps ?? w.location,
         rock_type: suspected || "Unidentified",
         method: result
           ? "AI visual suggestion; unconfirmed"
@@ -269,9 +294,11 @@ export function Scanner({
             : "Visual observation",
         chain_of_custody: "Not recorded",
         photos,
+        audio,
       });
-      setSaved(true);
+      setSaved(queued ? "offline" : "online");
       setPick(false);
+      w.refreshPending();
       haptic.success();
     } catch (e) {
       setError((e as Error).message);
@@ -453,14 +480,31 @@ export function Scanner({
               multiline
               style={[ui.field, { minHeight: 96, textAlignVertical: "top" }]}
             />
-            <Text style={ui.caption}>{w.location.name}</Text>
+            <VoiceNote value={audio} onChange={setAudio} />
+            <View style={[ui.row, { gap: 8 }]}>
+              <MapPin size={15} color={c.tint} />
+              <Text style={[ui.caption, { flex: 1 }]} numberOfLines={1}>
+                {gps ? `${gps.name} · ${coordinates(gps)}` : w.location.name}
+              </Text>
+              <Pressable accessibilityRole="button" onPress={pinGps} hitSlop={8}>
+                {locating ? (
+                  <ActivityIndicator color={c.tint} />
+                ) : (
+                  <Text style={{ ...type.footnote, fontWeight: "600", color: c.tint }}>
+                    {gps ? "Update GPS" : "Use GPS"}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
           </View>
           {!!error && <Text style={ui.error}>{error}</Text>}
           {saved ? (
             <FadeIn>
               <View style={[ui.row, { justifyContent: "center", padding: 8 }]}>
                 <Check size={20} color={c.tint} strokeWidth={3} />
-                <Text style={[ui.h3, { color: c.tint }]}>Saved.</Text>
+                <Text style={[ui.h3, { color: c.tint }]}>
+                  {saved === "offline" ? "Saved offline. Syncs when you're back online." : "Saved."}
+                </Text>
               </View>
             </FadeIn>
           ) : (
@@ -535,7 +579,7 @@ export function Scanner({
             disabled={!photos.length || busy}
             onPress={() => {
               setReview(true);
-              setSaved(false);
+              setSaved("");
             }}
             style={[s.side, { opacity: photos.length ? 1 : 0.35 }]}
           >

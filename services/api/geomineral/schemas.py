@@ -114,6 +114,20 @@ class RecordInput(BaseModel):
     method: str = Field(default="", max_length=120)
     chain_of_custody: str = Field(default="", max_length=2000)
     photos: list[str] = Field(default_factory=list, max_length=3)
+    # Voice note as a data URI; about two minutes of compressed speech.
+    audio: str | None = Field(default=None, max_length=2_000_000)
+
+    @field_validator("audio")
+    @classmethod
+    def clean_audio(cls, value: str | None) -> str | None:
+        import re
+
+        if value and not re.fullmatch(
+            r"data:audio/(mp4|m4a|x-m4a|aac|mpeg|webm|ogg)(;codecs=[\w.]+)?;base64,[A-Za-z0-9+/=]+",
+            value,
+        ):
+            raise ValueError("Voice note must be an audio file")
+        return value or None
 
     @field_validator("photos")
     @classmethod

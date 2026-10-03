@@ -9,6 +9,8 @@ export const API_ORIGIN =
       ? "http://10.0.2.2:8000"
       : "http://127.0.0.1:8000"
     : "");
+/** The server could not be reached (offline, timeout, DNS). */
+export class NetworkError extends Error {}
 let token: string | null = null,
   guest: string | null = null;
 export async function getStored(key: string) {
@@ -51,7 +53,7 @@ export async function api<T>(
       signal: options.signal || AbortSignal.timeout(25000),
     });
   } catch {
-    throw new Error(
+    throw new NetworkError(
       "Could not reach your workspace. Check your connection and try again.",
     );
   }

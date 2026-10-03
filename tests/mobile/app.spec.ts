@@ -340,3 +340,35 @@ test("rockdex collects a saved mineral and unlocks a badge", async ({ page }) =>
   await page.screenshot({ path: "test-results/rockdex.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("samples saved offline sync when back online", async ({ page, context }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.getByRole("button", { name: "New here? Create Account" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(`offline-${Date.now()}@example.test`);
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-native-test-only-passphrase");
+  await page.getByRole("button", { name: "Create Account", exact: true }).click();
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  await page.getByLabel("Project name", { exact: true }).fill("Cave survey");
+  await page.getByRole("button", { name: "Save Project", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Cave survey" })).toBeVisible();
+  await page.getByRole("tab", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Mineral Guide", exact: true }).click();
+  await page.getByLabel("Search minerals").fill("galena");
+  await page.getByRole("button", { name: "Open Galena profile" }).click();
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Add Sample" }).click();
+  await page.getByRole("button", { name: "Save to Cave survey" }).click();
+  await expect(page.getByText(/Saved offline/)).toBeVisible();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await expect(page.getByText("1 sample waiting to sync")).toBeVisible();
+  await context.setOffline(false);
+  await page.getByRole("button", { name: "Sync now" }).click();
+  await expect(page.getByText("1 sample waiting to sync")).toHaveCount(0);
+  await page.getByRole("button", { name: "Cave survey" }).click();
+  await expect(page.getByText("Galena field sample", { exact: true })).toBeVisible();
+});

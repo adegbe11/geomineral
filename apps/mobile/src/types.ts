@@ -14,7 +14,7 @@ import type {
   Project as SharedProject,
   FieldRecord as SharedRecord,
 } from "../../web/src/lib/types";
-export type FieldRecord = SharedRecord & { photos?: string[] };
+export type FieldRecord = SharedRecord & { photos?: string[]; audio?: string | null };
 export type Project = Omit<SharedProject, "records"> & {
   records?: FieldRecord[];
 };

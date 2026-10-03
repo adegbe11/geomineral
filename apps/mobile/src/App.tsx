@@ -27,6 +27,7 @@ import { FadeIn, haptic, StackScreen, TabFade } from "./motion";
 import { Profile, ProjectDetail, ProjectsList } from "./ProjectScreens";
 import { Scanner } from "./ScanScreen";
 import { api, authenticate, post, signOut } from "./services/api";
+import { projectsWithCache } from "./services/outbox";
 import { WorkspaceProvider, useWorkspace } from "./state/Workspace";
 import { type, useTheme } from "./theme";
 import type { Location, Project, Tab } from "./types";
@@ -144,7 +145,7 @@ function Shell() {
   useEffect(() => {
     if (w.user && w.tab === "Projects") {
       setBusy(true);
-      api<Project[]>("/projects")
+      projectsWithCache()
         .then(setProjects)
         .catch((e) => setError(e.message))
         .finally(() => setBusy(false));

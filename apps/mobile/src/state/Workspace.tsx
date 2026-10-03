@@ -6,6 +6,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
+import { flush, pending } from "../services/outbox";
 import {
   api,
   ensureGuest,
@@ -32,7 +34,8 @@ function useWorkspaceState() {
     [radius, setRadius] = useState(25),
     [scanPhotos, setScanPhotos] = useState<string[]>([]),
     [scanResult, setScanResult] = useState<ScanResult | null>(null),
-    [scanReview, setScanReview] = useState(false);
+    [scanReview, setScanReview] = useState(false),
+    [pendingCount, setPendingCount] = useState(() => pending().length);
   const [location, setLocation] = useState<Location>(initialLocation),
     [polygon, setPolygon] = useState<number[][]>([]),
     [analysis, setAnalysis] = useState<Analysis | null>(null),
@@ -68,6 +71,20 @@ function useWorkspaceState() {
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);
+  async function sync() {
+    if (pending().length && (await flush())) setPendingCount(pending().length);
+    else setPendingCount(pending().length);
+  }
+  useEffect(() => {
+    if (!user) return;
+    void sync();
+    const timer = setInterval(() => pending().length && void sync(), 30000);
+    const sub = AppState.addEventListener("change", (s) => s === "active" && void sync());
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [user]);
   function selectLocation(point: Location) {
     generation.current++;
     if (timer.current) clearTimeout(timer.current);
@@ -201,6 +218,9 @@ function useWorkspaceState() {
     setScanResult,
     scanReview,
     setScanReview,
+    pendingCount,
+    refreshPending: () => setPendingCount(pending().length),
+    sync,
     polygon,
     setPolygon,
     analysis,

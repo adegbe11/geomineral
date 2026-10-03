@@ -65,7 +65,7 @@ async def guard(request: Request, call_next):
         if request.headers.get("sec-fetch-site") == "cross-site":
             return Response("Cross-site request not allowed", status_code=403)
         limit = (
-            9_100_000
+            11_500_000
             if request.url.path == "/api/scan"
             or re.fullmatch(r"/api/projects/[^/]+/records", request.url.path)
             else 100_000
