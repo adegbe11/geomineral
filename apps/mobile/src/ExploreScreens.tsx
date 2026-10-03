@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react-native";
 import DeepTime from "./components/DeepTime";
+import LandStatus from "./components/LandStatus";
 import NativeMap from "./components/NativeMap";
 import PlaceSearch from "./components/PlaceSearch";
 import { Button, Empty, Header, Row } from "./components/Primitives";
@@ -490,6 +491,7 @@ export function AnalysisScreen({
                   </View>
                 </View>
               </FadeIn>
+              <LandStatus location={a.location} />
               <FadeIn delay={120}>
                 <Segmented
                   role="tab"

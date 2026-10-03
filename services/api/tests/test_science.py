@@ -274,3 +274,56 @@ async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):
     count = len(calls)
     assert await deeptime.positions(1.0, 2.0) == first
     assert len(calls) == count
+
+
+async def test_land_status_picks_most_restrictive_and_handles_gaps(monkeypatch):
+    from geomineral import land
+
+    responses = {
+        "park": [
+            {
+                "Mang_Name": "NPS",
+                "Des_Tp": "NP",
+                "Unit_Nm": "Yosemite National Park",
+                "GAP_Sts": "1",
+                "FeatClass": "Fee",
+            },
+            {
+                "Mang_Name": "USFS",
+                "Des_Tp": "NF",
+                "Unit_Nm": "Nearby forest",
+                "GAP_Sts": "3",
+                "FeatClass": "Fee",
+            },
+        ],
+        "blm": [
+            {
+                "Mang_Name": "BLM",
+                "Des_Tp": "PUB",
+                "Unit_Nm": "BLM land",
+                "GAP_Sts": "3",
+                "FeatClass": "Fee",
+            }
+        ],
+        "none": [],
+    }
+    current = {"key": "park"}
+    real = httpx.AsyncClient
+
+    def handler(request):
+        rows = responses[current["key"]]
+        return httpx.Response(200, json={"features": [{"attributes": a} for a in rows]})
+
+    monkeypatch.setattr(
+        land.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw)
+    )
+    park = await land.lookup(37.74, -119.58)
+    assert park["status"] == "No collecting"
+    assert park["unit"] == "Yosemite National Park"
+    current["key"] = "blm"
+    blm = await land.lookup(36.5, -116.0)
+    assert blm["status"] == "Limited collecting" and blm["manager"] == "Bureau of Land Management"
+    current["key"] = "none"
+    assert (await land.lookup(40.0, -100.0))["status"] == "No public land record"
+    outside = await land.lookup(6.98, 6.12)
+    assert outside["covered"] is False

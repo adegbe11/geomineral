@@ -399,3 +399,18 @@ test("deep time moves the place through past plates", async ({ page }) => {
   await page.screenshot({ path: "test-results/deeptime.png", fullPage: true });
   expect(errors).toEqual([]);
 });
+
+test("land status warns inside a national park", async ({ page }) => {
+  test.setTimeout(180000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  await page.getByLabel("Search any location", { exact: true }).fill("37.74, -119.58");
+  await page.getByRole("button", { name: "Search places" }).click();
+  await page.getByRole("button", { name: "37.74000, -119.58000" }).click();
+  await page.getByRole("button", { name: "Analyze Location" }).click();
+  await expect(page.getByRole("button", { name: "View Report" })).toBeVisible({ timeout: 120000 });
+  await expect(page.getByText("No collecting", { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText(/Yosemite National Park/)).toBeVisible();
+  await page.screenshot({ path: "test-results/land.png" });
+});

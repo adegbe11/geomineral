@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 
-from . import config, deeptime
+from . import config, deeptime, land
 from .auth import (
     current_user,
     hash_password,
@@ -230,6 +230,15 @@ async def search(q: str):
                 503,
                 "Place search is temporarily unavailable. Enter latitude, longitude or drop a pin on the map.",
             )
+
+
+@app.get("/api/land")
+async def land_status(lat: float, lng: float):
+    point = Point(lat=lat, lng=lng)
+    try:
+        return await land.lookup(point.lat, point.lng)
+    except (httpx.HTTPError, ValueError, KeyError):
+        raise HTTPException(503, "Land status is unavailable right now.")
 
 
 @app.get("/api/deeptime")
