@@ -527,10 +527,12 @@ export function AnalysisScreen({
   save,
   report,
   guide,
+  zones,
 }: {
   back: () => void;
   save: () => void;
   report: () => void;
+  zones: () => void;
   guide: (query?: string) => void;
 }) {
   const w = useWorkspace();
@@ -597,6 +599,31 @@ export function AnalysisScreen({
                   </View>
                 </View>
               </FadeIn>
+              {!!Object.keys(a.zones?.by_commodity ?? {}).length && (
+                <FadeIn delay={80}>
+                  <Pressy
+                    accessibilityRole="button"
+                    accessibilityLabel="View Potential Zones"
+                    onPress={zones}
+                    scaleTo={0.98}
+                    style={[ui.card, ui.row, { gap: 14 }]}
+                  >
+                    <View style={{ flexDirection: "row", borderRadius: 4, overflow: "hidden" }}>
+                      {["#F7E27A", "#F2A33A", "#E2552F", "#B5122E"].map((col) => (
+                        <View key={col} style={{ width: 8, height: 34, backgroundColor: col }} />
+                      ))}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={ui.h3}>Potential Zones</Text>
+                      <Text style={ui.small}>
+                        {Object.values(a.zones!.by_commodity).reduce((n, z) => n + z.targets.length, 0)} targets ·{" "}
+                        {Object.keys(a.zones!.by_commodity).join(", ")}
+                      </Text>
+                    </View>
+                    <ChevronRight size={18} color={c.tertiary} />
+                  </Pressy>
+                </FadeIn>
+              )}
               <LandStatus location={a.location} />
               <FadeIn delay={120}>
                 <Segmented

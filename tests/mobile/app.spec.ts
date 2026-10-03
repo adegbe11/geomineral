@@ -456,3 +456,23 @@ test("home analyze shows loading, rises as a sheet and resets on return", async 
     .evaluate((el) => getComputedStyle(el).opacity);
   expect(Number(opacity)).toBeGreaterThan(0.9);
 });
+
+test("potential zones show a heatmap with named targets", async ({ page }) => {
+  test.setTimeout(180000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  await page.getByLabel("Search any location", { exact: true }).fill("-30.7489, 121.4658");
+  await page.getByRole("button", { name: "Search places" }).click();
+  await page.getByRole("button", { name: "-30.74890, 121.46580" }).click();
+  await page.getByRole("button", { name: "Analyze Location" }).click();
+  await page.getByRole("button", { name: "View Potential Zones" }).click({ timeout: 120000 });
+  await expect(page.getByRole("button", { name: /^Target GM-KAL-01$/ }).first()).toBeVisible();
+  await expect(page.getByText(/recorded gold sites in and around the zone/).first()).toBeVisible();
+  await page.getByRole("button", { name: /^Target GM-KAL-01$/ }).first().click();
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: "test-results/zones.png", fullPage: true });
+  expect(errors).toEqual([]);
+});

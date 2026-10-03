@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { siteColor } from "../theme";
+import { cellRing, heatColor } from "./mapStyle";
 import type { MapProps } from "./NativeMap";
 
 const circle = (lng: number, lat: number, km: number) => {
@@ -29,6 +30,10 @@ export default function NativeMap({
   interactive = true,
   world = false,
   geology,
+  heat,
+  targets = [],
+  selectedTarget,
+  onTarget,
 }: MapProps) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -122,6 +127,13 @@ export default function NativeMap({
         type: "line",
         source: "faults",
         paint: { "line-color": "#FF5A4E", "line-width": 1.6, "line-opacity": 0.95 },
+      });
+      m.addSource("heat", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addLayer({
+        id: "heat",
+        type: "fill",
+        source: "heat",
+        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.62 },
       });
       m.addSource("sites", {
         type: "geojson",
@@ -227,6 +239,14 @@ export default function NativeMap({
         geometry: { type: "Point", coordinates: [o.lng, o.lat] },
       })),
     });
+    (m.getSource("heat") as maplibregl.GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: (heat?.cells ?? []).map(([lng, lat, s]) => ({
+        type: "Feature",
+        properties: { color: heatColor(s) },
+        geometry: { type: "Polygon", coordinates: [cellRing(lng, lat, heat!.cellKm)] },
+      })),
+    });
     (m.getSource("units") as maplibregl.GeoJSONSource).setData({
       type: "FeatureCollection",
       features: (geology?.units ?? []).map((u) => ({
@@ -243,7 +263,28 @@ export default function NativeMap({
         geometry: { type: "MultiLineString", coordinates: f.paths },
       })),
     });
-  }, [loaded, location, radiusKm, polygon, sites, selectedSite, geology]);
+  }, [loaded, location, radiusKm, polygon, sites, selectedSite, geology, heat]);
+  // Target labels as DOM markers (the raster style has no font glyphs).
+  const targetCallback = useRef(onTarget);
+  targetCallback.current = onTarget;
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !loaded) return;
+    const markers = targets.map((t) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.setAttribute("aria-label", `Target ${t.id}`);
+      const on = t.id === selectedTarget;
+      el.textContent = t.id.slice(-2);
+      el.style.cssText = `font:700 11px -apple-system,system-ui,sans-serif;padding:4px 8px;border-radius:10px;cursor:pointer;border:1.5px solid ${heatColor(t.score)};background:${on ? "#fff" : "rgba(17,24,19,.9)"};color:${on ? "#111813" : "#fff"}`;
+      el.onclick = (e) => {
+        e.stopPropagation();
+        targetCallback.current?.(t);
+      };
+      return new maplibregl.Marker({ element: el }).setLngLat([t.lng, t.lat]).addTo(m);
+    });
+    return () => markers.forEach((mk) => mk.remove());
+  }, [loaded, targets, selectedTarget]);
   return (
     <View style={{ flex: 1 }}>
       <div ref={host} style={{ position: "absolute", inset: 0 }} />

@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { Platform, Text, View } from "react-native";
 import MapView, { Circle, Marker, Polygon, Polyline } from "react-native-maps";
 import { siteColor } from "../theme";
-import type { Location, Occurrence } from "../types";
+import { cellRing, heatColor } from "./mapStyle";
+import type { Location, Occurrence, Target } from "../types";
 export type MapProps = {
   location: Location;
   onSelect: (p: Location) => void;
@@ -18,7 +19,13 @@ export type MapProps = {
   world?: boolean;
   /** Mapped rock units and faults drawn over the imagery. */
   geology?: GeologyLayers;
+  /** Potential-zone heat cells [lng, lat, score 0-1] and named targets. */
+  heat?: { cells: [number, number, number][]; cellKm: number };
+  targets?: Target[];
+  selectedTarget?: string;
+  onTarget?: (t: Target) => void;
 };
+
 export type GeologyLayers = {
   faults?: { type: string; paths: number[][][] }[];
   units?: { name: string; color: string; rings: number[][][] }[];
@@ -38,6 +45,10 @@ export default function NativeMap({
   interactive = true,
   world = false,
   geology,
+  heat,
+  targets = [],
+  selectedTarget,
+  onTarget,
 }: MapProps) {
   const ref = useRef<MapView>(null);
   const span = world ? 140 : radiusKm ? spanFor(radiusKm) : 0.15;
@@ -139,6 +150,41 @@ export default function NativeMap({
           />
         )),
       )}
+      {heat?.cells
+        .filter(([, , s]) => s >= 0.25)
+        .slice(0, 400)
+        .map(([lng, lat, s], i) => (
+          <Polygon
+            key={`h${i}`}
+            coordinates={cellRing(lng, lat, heat.cellKm).map(([x, y]) => ({ latitude: y, longitude: x }))}
+            fillColor={`${heatColor(s)}99`}
+            strokeWidth={0}
+          />
+        ))}
+      {targets.map((t) => (
+        <Marker
+          key={selectedTarget === t.id ? `${t.id}-on` : t.id}
+          coordinate={{ latitude: t.lat, longitude: t.lng }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
+          onPress={() => onTarget?.(t)}
+        >
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 10,
+              backgroundColor: selectedTarget === t.id ? "#FFFFFF" : "#111813E6",
+              borderWidth: 1.5,
+              borderColor: heatColor(t.score),
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: "700", color: selectedTarget === t.id ? "#111813" : "#FFFFFF" }}>
+              {t.id.slice(-2)}
+            </Text>
+          </View>
+        </Marker>
+      ))}
       {!world && (
         <Marker
           coordinate={{ latitude: location.lat, longitude: location.lng }}

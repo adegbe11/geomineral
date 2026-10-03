@@ -475,3 +475,60 @@ async def test_structure_reads_fault_distance_from_tiles(monkeypatch):
     assert result.status == "available"
     assert result.evidence[0].raw_value["count"] == 1
     assert result.layers["faults"][0]["paths"]
+
+
+def test_zones_find_a_target_at_the_cluster_and_name_it():
+    from geomineral.zones import build_zones
+
+    # Three producing gold sites ~8 km east of the pin, on mapped greenstone, beside a fault.
+    sites = [
+        {"lat": 0.0 + d, "lng": 0.072 + d, "status": "Producer", "commodities": ["Gold"]}
+        for d in (0.0, 0.005, -0.005)
+    ]
+    layers = {
+        "units": [
+            {
+                "name": "Greenstone belt",
+                "lith": "greenstone",
+                "rings": [
+                    [[0.04, -0.04], [0.11, -0.04], [0.11, 0.04], [0.04, 0.04], [0.04, -0.04]]
+                ],
+            }
+        ],
+        "faults": [{"type": "fault", "paths": [[[0.08, -0.2], [0.08, 0.2]]]}],
+    }
+    zones = build_zones(0.0, 0.0, 25, "Testville", ["Gold"], layers, sites)
+    target = zones["by_commodity"]["Gold"]["targets"][0]
+    assert target["id"] == "GM-TES-01"
+    assert 6 < target["distance_km"] < 11
+    assert target["score"] == zones["by_commodity"]["Gold"]["max"]
+    assert any("greenstone" in r.lower() for r in target["reasons"])
+    assert any("fault" in r for r in target["reasons"])
+
+
+def test_no_zones_without_positioned_evidence():
+    from geomineral.analysis import build_analysis
+    from geomineral.literature import OPENALEX
+
+    paper = Evidence(
+        id="openalex:W1:Clay",
+        source_id="openalex",
+        feature_id="W1",
+        evidence_type="literature",
+        commodity="Clay",
+        direction="positive",
+        description="Synthetic study",
+        raw_value={
+            "title": "Clay deposits",
+            "year": 2023,
+            "url": "https://doi.org/x",
+            "place": "X",
+            "studied": True,
+        },
+    )
+    result = build_analysis(
+        AnalysisRequest(location=Point(lat=0, lng=0, name="X")),
+        [ProviderResult(source=OPENALEX, status="available", evidence=[paper])],
+    )
+    assert result["assessments"][0]["commodity"] == "Clay"
+    assert result["zones"]["by_commodity"] == {}

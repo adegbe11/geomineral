@@ -22,6 +22,7 @@ import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
 import OrbitingEarth from "./components/OrbitingEarth";
 import PlaceSearch from "./components/PlaceSearch";
 import HomeScreen from "./HomeScreen";
+import ZonesScreen from "./ZonesScreen";
 import IdentifyScreen from "./IdentifyScreen";
 import MineralGuide from "./MineralGuide";
 import { FadeIn, haptic, StackScreen, TabFade } from "./motion";
@@ -44,7 +45,8 @@ type Route =
   | { name: "report" }
   | { name: "guide"; query: string }
   | { name: "project" }
-  | { name: "identify"; suggested: string[] };
+  | { name: "identify"; suggested: string[] }
+  | { name: "zones" };
 const TABS = [
   ["Home", Home],
   ["Explore", Compass],
@@ -238,9 +240,12 @@ function Shell() {
             back={back}
             save={save}
             report={() => push({ name: "report" })}
+            zones={() => push({ name: "zones" })}
             guide={openGuide}
           />
         );
+      case "zones":
+        return <ZonesScreen back={back} />;
       case "identify":
         return <IdentifyScreen back={back} suggested={r.suggested} open={openGuide} />;
       case "report":

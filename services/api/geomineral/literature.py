@@ -168,6 +168,7 @@ class LiteratureProvider:
                 status="available" if evidence else "empty",
                 evidence=evidence,
                 message=msg,
+                layers={"place": [name]},
             )
         sem = asyncio.Semaphore(4)
         anchor = word(name)
@@ -207,6 +208,7 @@ class LiteratureProvider:
                 source=self.source,
                 status="unavailable",
                 message="The free daily research allowance is used up. It resets at midnight UTC.",
+                layers={"place": [name]},
             )
         evidence = []
         per_mineral: dict[str, int] = {}
@@ -250,4 +252,5 @@ class LiteratureProvider:
             status="available" if evidence else "empty",
             evidence=evidence,
             message=msg,
+            layers={"place": [name]},
         )

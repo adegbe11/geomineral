@@ -88,12 +88,26 @@ export type Analysis = {
     units?: { name: string; lith: string; age: string; color: string; here: boolean; rings: number[][][] }[];
   };
   structure?: { nearest_km: number | null; count: number; total_km: number };
+  zones?: {
+    cell_km: number | null;
+    by_commodity: Record<string, { max: number; cells: [number, number, number][]; targets: Target[] }>;
+  };
   rating?: string;
   summary: string;
   coverage: { name: string; status: string; detail: string }[];
   evidence_quality: string;
   limitations: string[];
   next_steps: string[];
+};
+export type Target = {
+  id: string;
+  commodity: string;
+  lat: number;
+  lng: number;
+  score: number;
+  area_km2: number;
+  distance_km: number;
+  reasons: string[];
 };
 export type Run = {
   id: string;

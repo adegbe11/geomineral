@@ -228,6 +228,29 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
     )
 
 
+def _zones(request, assessments, layers, occurrences) -> dict:
+    from .zones import build_zones
+
+    spatial = [
+        a.commodity
+        for a in assessments
+        if a.prospectivity != Category.INSUFFICIENT and (a.site_count or a.host_rocks)
+    ][:4]
+    if not spatial:
+        return {"cell_km": None, "by_commodity": {}}
+    # Prefer the town name the research step resolved (pins may only have coordinates).
+    place = (layers.get("place") or [(request.location.name or "").split(",")[0]])[0]
+    return build_zones(
+        request.location.lat,
+        request.location.lng,
+        request.radius_km,
+        place,
+        spatial,
+        layers,
+        occurrences,
+    )
+
+
 def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) -> dict:
     evidence = [e for provider in providers for e in provider.evidence]
     geology = [e for e in evidence if e.evidence_type == "mapped_geology"]
@@ -302,6 +325,8 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
         "assessments": [a.model_dump() for a in assessments],
         "occurrences": occurrences,
         "geology_units": units,
+        "zones": _zones(request, assessments, layers, occurrences),
+        "place": (layers.pop("place", None) or [request.location.name])[0],
         "layers": layers,
         "structure": next(
             (e.raw_value for e in evidence if e.evidence_type == "structure"),
