@@ -5,6 +5,8 @@ const cleartext = (process.env.EXPO_PUBLIC_API_ORIGIN ?? "").startsWith("http:")
 const config: ExpoConfig = {
   name: "GeoMineral",
   slug: "geomineral",
+  owner: "adegbe",
+  extra: { eas: { projectId: "3cef97dd-bbde-4229-b27b-bb897f6e993e" } },
   version: "1.0.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
