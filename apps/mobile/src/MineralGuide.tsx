@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { ChevronRight, FlaskConical, MapPin, Search } from "lucide-react-native";
 import { Button, Empty, Header, Row } from "./components/Primitives";
+import CrystalShimmer from "./components/CrystalShimmer";
 import MineralArt from "./components/MineralArt";
 import { RatingPill } from "./ExploreScreens";
 import {
@@ -283,9 +284,13 @@ export default function MineralGuide({
                   { alignItems: "center", paddingVertical: 30, backgroundColor: selected.color + "1C", boxShadow: "none" },
                 ]}
               >
-                <Float>
-                  <MineralArt color={selected.color} habit={selected.habit} size={140} />
-                </Float>
+                <CrystalShimmer size={160} radius={40}>
+                  <View style={{ width: 160, height: 160, alignItems: "center", justifyContent: "center" }}>
+                    <Float>
+                      <MineralArt color={selected.color} habit={selected.habit} size={140} />
+                    </Float>
+                  </View>
+                </CrystalShimmer>
                 <Text style={ui.largeTitle}>{selected.name}</Text>
                 <Text style={[ui.body, { textAlign: "center" }]}>
                   {selected.rock ? selected.group : `${selected.species ? selected.formula : pretty(selected.formula)} · ${selected.group}`}

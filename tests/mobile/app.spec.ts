@@ -430,3 +430,21 @@ test("guide searches every IMA mineral species", async ({ page }) => {
   await page.screenshot({ path: "test-results/species.png" });
   expect(errors).toEqual([]);
 });
+
+test("home analyze shows loading, rises as a sheet and resets on return", async ({ page }) => {
+  test.setTimeout(180000);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("button", { name: "Analyze Location" }).click();
+  await expect(page.getByText("Analysis", { exact: true })).toBeVisible();
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: "test-results/sheet-rising.png" });
+  await expect(page.getByRole("button", { name: "View Report" })).toBeVisible({ timeout: 120000 });
+  await page.getByRole("button", { name: "Go back" }).click();
+  await expect(page.getByText("Analyze Location", { exact: true })).toBeVisible();
+  await page.waitForTimeout(800);
+  const opacity = await page
+    .getByText("Analyze Location", { exact: true })
+    .evaluate((el) => getComputedStyle(el).opacity);
+  expect(Number(opacity)).toBeGreaterThan(0.9);
+});

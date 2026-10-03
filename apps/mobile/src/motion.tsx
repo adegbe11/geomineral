@@ -24,6 +24,11 @@ import { type, useTheme } from "./theme";
 
 const native = Platform.OS !== "web";
 
+// Shared physics, mirrored in docs/motion.md.
+export const SPRING_PRESS = { stiffness: 300, damping: 25, mass: 1 };
+export const EASE_REVEAL = Easing.bezier(0.25, 1, 0.5, 1); // 0.4 s reveals
+export const EASE_OUT = Easing.out(Easing.cubic);
+
 // One shared Reduce Motion flag for the whole app.
 let reduced = false;
 const listeners = new Set<(v: boolean) => void>();
@@ -117,12 +122,7 @@ export function Pressy({
 }) {
   const s = useRef(new Animated.Value(1)).current;
   const spring = (to: number) =>
-    Animated.spring(s, {
-      toValue: to,
-      speed: 40,
-      bounciness: to === 1 ? 8 : 0,
-      useNativeDriver: native,
-    }).start();
+    Animated.spring(s, { toValue: to, ...SPRING_PRESS, useNativeDriver: native }).start();
   return (
     <Pressable
       {...rest}
@@ -274,24 +274,25 @@ export function Segmented<T extends string | number>({
 export function StackScreen({
   children,
   onBack,
+  from = "right",
 }: {
   children: (back: () => void) => ReactNode;
   onBack: () => void;
+  /** "bottom" rises like a results sheet; "right" is a standard push. */
+  from?: "right" | "bottom";
 }) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { c } = useTheme();
   const still = useReduceMotion();
-  const w = Math.min(width, 430);
+  const sheet = from === "bottom";
+  const w = sheet ? height : Math.min(width, 430);
   const x = useRef(new Animated.Value(still ? 0 : w)).current;
   const leaving = useRef(false);
   useEffect(() => {
     if (still) return;
-    Animated.spring(x, {
-      toValue: 0,
-      speed: 16,
-      bounciness: 0,
-      useNativeDriver: native,
-    }).start();
+    if (sheet)
+      Animated.timing(x, { toValue: 0, duration: 400, easing: EASE_REVEAL, useNativeDriver: native }).start();
+    else Animated.spring(x, { toValue: 0, speed: 16, bounciness: 0, useNativeDriver: native }).start();
   }, []);
   const back = () => {
     if (leaving.current) return;
@@ -299,25 +300,29 @@ export function StackScreen({
     if (still) return onBack();
     Animated.timing(x, {
       toValue: w,
-      duration: 260,
+      duration: sheet ? 320 : 260,
       easing: Easing.bezier(0.3, 0, 0.6, 1),
       useNativeDriver: native,
     }).start(() => onBack());
   };
   const pan = useRef(
     PanResponder.create({
+      // Right pushes: swipe from the left edge. Sheets: drag down from the top bar.
       onMoveShouldSetPanResponder: (e, g) =>
-        g.x0 - g.dx < 28 && g.dx > 8 && Math.abs(g.dy) < Math.abs(g.dx),
-      onPanResponderMove: (_, g) => x.setValue(Math.max(0, g.dx)),
+        sheet
+          ? g.y0 - g.dy < 110 && g.dy > 10 && Math.abs(g.dx) < Math.abs(g.dy)
+          : g.x0 - g.dx < 28 && g.dx > 8 && Math.abs(g.dy) < Math.abs(g.dx),
+      onPanResponderMove: (_, g) => x.setValue(Math.max(0, sheet ? g.dy : g.dx)),
       onPanResponderRelease: (_, g) => {
-        if (g.dx > w * 0.33 || g.vx > 0.6) {
+        const d = sheet ? g.dy : g.dx,
+          v = sheet ? g.vy : g.vx;
+        if (d > w * (sheet ? 0.2 : 0.33) || v > 0.6) {
           haptic.select();
           back();
-        } else
-          Animated.spring(x, { toValue: 0, speed: 20, bounciness: 4, useNativeDriver: native }).start();
+        } else Animated.spring(x, { toValue: 0, ...SPRING_PRESS, useNativeDriver: native }).start();
       },
       onPanResponderTerminate: () =>
-        Animated.spring(x, { toValue: 0, useNativeDriver: native }).start(),
+        Animated.spring(x, { toValue: 0, ...SPRING_PRESS, useNativeDriver: native }).start(),
     }),
   ).current;
   return (
@@ -326,8 +331,8 @@ export function StackScreen({
         style={{
           flex: 1,
           backgroundColor: c.bg,
-          transform: [{ translateX: x }],
-          boxShadow: "-8px 0px 24px rgba(0,0,0,0.08)",
+          transform: [sheet ? { translateY: x } : { translateX: x }],
+          boxShadow: sheet ? "0px -8px 30px rgba(0,0,0,0.25)" : "-8px 0px 24px rgba(0,0,0,0.08)",
         }}
       >
         {children(back)}

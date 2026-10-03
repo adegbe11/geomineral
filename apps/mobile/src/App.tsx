@@ -34,7 +34,7 @@ import type { Location, Project, Tab } from "./types";
 
 const native = Platform.OS !== "web";
 type Route =
-  | { name: "analysis" }
+  | { name: "analysis"; from?: "bottom" }
   | { name: "report" }
   | { name: "guide"; query: string }
   | { name: "project" }
@@ -171,9 +171,9 @@ function Shell() {
         .finally(() => setBusy(false));
     } else if (!w.user) setProjects([]);
   }, [w.user, w.tab, saving, stack.length]);
-  const analyze = (point?: Location) => {
+  const analyze = (point?: Location, from?: "bottom") => {
     if (point) w.selectLocation(point);
-    if (top?.name !== "analysis") push({ name: "analysis" });
+    if (top?.name !== "analysis") push({ name: "analysis", from });
     void w.analyze(point);
   };
   const save = () => {
@@ -325,7 +325,8 @@ function Shell() {
           <TabFade id={w.tab}>
             {w.tab === "Home" ? (
               <HomeScreen
-                analyze={() => analyze()}
+                covered={stack.length > 0}
+                analyze={() => analyze(undefined, "bottom")}
                 guide={openGuide}
                 identify={() => identify()}
                 openRecent={(id) => {
@@ -389,7 +390,9 @@ function Shell() {
               accessibilityElementsHidden={i !== stack.length - 1}
               importantForAccessibility={i === stack.length - 1 ? "auto" : "no-hide-descendants"}
             >
-              <StackScreen onBack={pop}>{(back) => screen(r, back)}</StackScreen>
+              <StackScreen onBack={pop} from={r.name === "analysis" ? r.from : undefined}>
+                {(back) => screen(r, back)}
+              </StackScreen>
             </View>
           ))}
         </View>

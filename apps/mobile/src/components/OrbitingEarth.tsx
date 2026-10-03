@@ -11,11 +11,13 @@ import {
 
 export default function OrbitingEarth({
   style,
+  zoom,
 }: {
   style: StyleProp<ImageStyle>;
+  /** Optional scale driven by the caller (Analyze zoom). */
+  zoom?: Animated.Value;
 }) {
   const spin = useRef(new Animated.Value(0)).current;
-  const orbit = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(true);
   const [active, setActive] = useState(AppState.currentState === "active");
 
@@ -46,28 +48,20 @@ export default function OrbitingEarth({
 
   useEffect(() => {
     if (reduceMotion || !active) return;
-    spin.setValue(0);
-    orbit.setValue(0);
-    const config = {
-      easing: Easing.linear,
-      useNativeDriver: Platform.OS !== "web",
-      isInteraction: false,
-    };
+    // One full turn every 120 s, linear: an atmosphere, not a spinning wheel.
     const rotation = Animated.loop(
-      Animated.timing(spin, { ...config, toValue: 1, duration: 160000 }),
-    );
-    const drift = Animated.loop(
-      Animated.timing(orbit, { ...config, toValue: 1, duration: 24000 }),
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 120000,
+        easing: Easing.linear,
+        useNativeDriver: Platform.OS !== "web",
+        isInteraction: false,
+      }),
     );
     rotation.start();
-    drift.start();
-    return () => {
-      rotation.stop();
-      drift.stop();
-    };
-  }, [active, reduceMotion, spin, orbit]);
+    return () => rotation.stop();
+  }, [active, reduceMotion, spin]);
 
-  const phases = Array.from({ length: 33 }, (_, i) => i / 32);
   return (
     <Animated.Image
       accessible={false}
@@ -76,32 +70,14 @@ export default function OrbitingEarth({
       style={[
         style,
         {
-          transform: reduceMotion
-            ? [{ rotate: "-22deg" }]
-            : [
-                {
-                  translateX: orbit.interpolate({
-                    inputRange: phases,
-                    outputRange: phases.map(
-                      (p) => Math.cos(p * Math.PI * 2) * 10 - 10,
-                    ),
-                  }),
-                },
-                {
-                  translateY: orbit.interpolate({
-                    inputRange: phases,
-                    outputRange: phases.map(
-                      (p) => Math.sin(p * Math.PI * 2) * 7,
-                    ),
-                  }),
-                },
-                {
-                  rotate: spin.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["-22deg", "338deg"],
-                  }),
-                },
-              ],
+          transform: [
+            { scale: zoom ?? 1 },
+            {
+              rotate: reduceMotion
+                ? "-22deg"
+                : spin.interpolate({ inputRange: [0, 1], outputRange: ["-22deg", "338deg"] }),
+            },
+          ],
         },
       ]}
     />

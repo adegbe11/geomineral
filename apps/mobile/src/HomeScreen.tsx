@@ -1,5 +1,6 @@
-import { useRef, type ReactNode } from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import CrystalShimmer from "./components/CrystalShimmer";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { BookOpen, ChevronRight, FlaskConical, Folder, UserRound } from "lucide-react-native";
@@ -7,7 +8,7 @@ import { Brand, MineralArt } from "./components/Primitives";
 import OrbitingEarth from "./components/OrbitingEarth";
 import PlaceSearch from "./components/PlaceSearch";
 import { minerals, pretty } from "./minerals";
-import { FadeIn, Float, Pressy } from "./motion";
+import { EASE_OUT, EASE_REVEAL, FadeIn, Float, Pressy, SPRING_PRESS, useReduceMotion } from "./motion";
 import { SPECIES_COUNT } from "./species";
 import { useWorkspace } from "./state/Workspace";
 import { ratingColor, ratingLabel, type } from "./theme";
@@ -110,7 +111,10 @@ export default function HomeScreen({
   guide,
   identify,
   openRecent,
+  covered,
 }: {
+  /** True while another screen is stacked on top of Home. */
+  covered: boolean;
   analyze: () => void;
   guide: (name?: string) => void;
   identify: () => void;
@@ -119,6 +123,33 @@ export default function HomeScreen({
   const w = useWorkspace();
   const y = useRef(new Animated.Value(0)).current;
   const featured = today();
+  const still = useReduceMotion();
+  // Analyze sequence: label out, spinner in, Earth zooms, panel settles, sheet rises.
+  const [loading, setLoading] = useState(false);
+  const label = useRef(new Animated.Value(1)).current;
+  const zoom = useRef(new Animated.Value(1)).current;
+  const panel = useRef(new Animated.Value(0)).current;
+  function start() {
+    if (loading) return;
+    setLoading(true);
+    if (still) return analyze();
+    Animated.parallel([
+      Animated.timing(label, { toValue: 0, duration: 150, easing: EASE_OUT, useNativeDriver: native }),
+      Animated.timing(zoom, { toValue: 1.05, duration: 700, easing: EASE_OUT, useNativeDriver: native }),
+      Animated.timing(panel, { toValue: 1, duration: 400, easing: EASE_REVEAL, useNativeDriver: native }),
+    ]).start();
+    setTimeout(analyze, 260);
+  }
+  useEffect(() => {
+    if (covered || !loading) return;
+    // Back on Home: everything returns to rest.
+    setLoading(false);
+    Animated.parallel([
+      Animated.spring(label, { toValue: 1, ...SPRING_PRESS, useNativeDriver: native }),
+      Animated.spring(zoom, { toValue: 1, ...SPRING_PRESS, useNativeDriver: native }),
+      Animated.spring(panel, { toValue: 0, ...SPRING_PRESS, useNativeDriver: native }),
+    ]).start();
+  }, [covered]);
   return (
     <View style={{ flex: 1, backgroundColor: G.bottom }}>
       <LinearGradient
@@ -143,7 +174,7 @@ export default function HomeScreen({
           },
         ]}
       >
-        <OrbitingEarth style={s.earth} />
+        <OrbitingEarth style={s.earth} zoom={zoom} />
         <LinearGradient
           colors={["rgba(6,21,15,0.55)", "transparent", "rgba(6,21,15,0.35)", G.bottom]}
           locations={[0, 0.12, 0.3, 0.62]}
@@ -174,17 +205,40 @@ export default function HomeScreen({
 
         <View style={{ paddingHorizontal: 16, gap: 28 }}>
           <FadeIn delay={140}>
+            <Animated.View
+              style={{
+                opacity: panel.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }),
+                transform: [
+                  { translateY: panel.interpolate({ inputRange: [0, 1], outputRange: [0, 28] }) },
+                  { scale: panel.interpolate({ inputRange: [0, 1], outputRange: [1, 0.97] }) },
+                ],
+              }}
+            >
             <Glass style={{ padding: 14, gap: 12 }}>
               <PlaceSearch onSelect={w.selectLocation} tone="glass" current={w.location.name} />
               <Pressy
                 accessibilityRole="button"
                 accessibilityLabel="Analyze Location"
-                onPress={analyze}
+                accessibilityState={{ busy: loading }}
+                onPress={start}
+                scaleTo={0.96}
                 style={s.primary}
               >
-                <Text style={{ ...type.headline, color: G.onTint }}>Analyze Location</Text>
+                <Animated.Text style={{ ...type.headline, color: G.onTint, opacity: label }}>
+                  Analyze Location
+                </Animated.Text>
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    opacity: label.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+                  }}
+                >
+                  {loading && <ActivityIndicator color={G.onTint} />}
+                </Animated.View>
               </Pressy>
             </Glass>
+            </Animated.View>
           </FadeIn>
 
           {w.recent.length > 0 && (
@@ -220,11 +274,13 @@ export default function HomeScreen({
                 scaleTo={0.97}
               >
                 <Glass style={{ flexDirection: "row", alignItems: "center", gap: 16, padding: 16 }}>
-                  <View style={[s.art, { backgroundColor: featured.color + "33" }]}>
-                    <Float>
-                      <MineralArt color={featured.color} habit={featured.habit} size={68} />
-                    </Float>
-                  </View>
+                  <CrystalShimmer size={88}>
+                    <View style={[s.art, { backgroundColor: featured.color + "33" }]}>
+                      <Float>
+                        <MineralArt color={featured.color} habit={featured.habit} size={68} />
+                      </Float>
+                    </View>
+                  </CrystalShimmer>
                   <View style={{ flex: 1, gap: 3 }}>
                     <Text style={{ ...type.title3, color: G.text }}>{featured.name}</Text>
                     <Text style={{ ...type.subhead, color: G.secondary }}>{pretty(featured.formula)}</Text>
