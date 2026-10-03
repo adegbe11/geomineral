@@ -12,7 +12,8 @@
     "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/mobile/src/*.tsx\"",
     "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/mobile/src/*.tsx\"",
     "dev:mobile": "npm run web --prefix apps/mobile",
-    "test:mobile": "playwright test -c playwright.mobile.config.ts"
+    "test:mobile": "playwright test -c playwright.mobile.config.ts",
+    "audit:mobile": "playwright test -c playwright.audit.config.ts --reporter=line"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

@@ -248,6 +248,7 @@ export function Segmented<T extends string | number>({
           accessibilityRole={role}
           accessibilityLabel={a11y ? a11y(item) : label(item)}
           accessibilityState={{ selected: item === value }}
+          aria-selected={item === value}
           onPress={() => {
             if (item !== value) haptic.select();
             onChange(item);

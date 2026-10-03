@@ -33,6 +33,11 @@ import { type, useTheme } from "./theme";
 import type { Location, Project, Tab } from "./types";
 
 const native = Platform.OS !== "web";
+// Hide covered screens from screen readers with each platform's own prop.
+const hidden = (on: boolean) =>
+  Platform.OS === "web"
+    ? { "aria-hidden": on }
+    : { accessibilityElementsHidden: on, importantForAccessibility: on ? ("no-hide-descendants" as const) : ("auto" as const) };
 type Route =
   | { name: "analysis"; from?: "bottom" }
   | { name: "report" }
@@ -103,6 +108,7 @@ function TabBar({
           <Pressable
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
+            aria-selected={on}
             accessibilityLabel={name}
             key={name}
             onPress={() => {
@@ -318,9 +324,7 @@ function Shell() {
         <View style={{ flex: 1 }}>
           <View
             style={{ flex: 1 }}
-            aria-hidden={stack.length > 0}
-            accessibilityElementsHidden={stack.length > 0}
-            importantForAccessibility={stack.length ? "no-hide-descendants" : "auto"}
+            {...hidden(stack.length > 0)}
           >
           <TabFade id={w.tab}>
             {w.tab === "Home" ? (
@@ -386,9 +390,7 @@ function Shell() {
               key={`${i}-${r.name}`}
               style={StyleSheet.absoluteFill}
               pointerEvents={i === stack.length - 1 ? "auto" : "none"}
-              aria-hidden={i !== stack.length - 1}
-              accessibilityElementsHidden={i !== stack.length - 1}
-              importantForAccessibility={i === stack.length - 1 ? "auto" : "no-hide-descendants"}
+              {...hidden(i !== stack.length - 1)}
             >
               <StackScreen onBack={pop} from={r.name === "analysis" ? r.from : undefined}>
                 {(back) => screen(r, back)}

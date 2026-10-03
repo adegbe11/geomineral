@@ -203,7 +203,7 @@ export function Explore({
             setSite(null);
             if (drawing) {
               haptic.tap();
-              w.setPolygon([...w.polygon, [p.lng, p.lat]]);
+              w.setPolygon((old) => [...old, [p.lng, p.lat]]);
             } else w.selectLocation(p);
           }}
         />

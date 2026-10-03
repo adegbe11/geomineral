@@ -23,7 +23,7 @@ import * as LocationService from "expo-location";
 import VoiceNote from "./components/VoiceNote";
 import { api, coordinates, ensureGuest } from "./services/api";
 import { projectsWithCache, saveRecord } from "./services/outbox";
-import { useWorkspace } from "./state/Workspace";
+import { EMPTY_DRAFT, useWorkspace, type ScanDraft } from "./state/Workspace";
 import { type, useTheme } from "./theme";
 import type { Location, Project, ScanResult } from "./types";
 
@@ -153,16 +153,19 @@ export function Scanner({
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [identifying, setIdentifying] = useState(0),
-    [title, setTitle] = useState("Field rock sample"),
-    [notes, setNotes] = useState(""),
-    [mineralQuery, setMineralQuery] = useState(""),
-    [suspected, setSuspected] = useState(""),
     [projects, setProjects] = useState<Project[]>([]),
     [pick, setPick] = useState(false),
     [saved, setSaved] = useState<"" | "online" | "offline">(""),
-    [audio, setAudio] = useState<string | null>(null),
-    [gps, setGps] = useState<Location | null>(null),
     [locating, setLocating] = useState(false);
+  const d = w.scanDraft;
+  const patch = (p: Partial<ScanDraft>) => w.setScanDraft((old) => ({ ...old, ...p }));
+  const { title, notes, mineralQuery, suspected, audio, gps } = d;
+  const setTitle = (title: string) => patch({ title }),
+    setNotes = (notes: string) => patch({ notes }),
+    setMineralQuery = (mineralQuery: string) => patch({ mineralQuery }),
+    setSuspected = (suspected: string) => patch({ suspected }),
+    setAudio = (audio: string | null) => patch({ audio }),
+    setGps = (gps: Location | null) => patch({ gps });
   async function pinGps() {
     setLocating(true);
     setError("");
@@ -187,13 +190,17 @@ export function Scanner({
       .then(setVision)
       .catch(() => setVision({ available: false, provider: "" }));
   }, []);
+  // Only a new identification fills in the mineral; returning to this tab keeps the user's choice.
+  const seenResult = useRef(result);
   useEffect(() => {
-    const top = result?.candidates?.[0];
-    setSuspected(top ?? "");
-    setMineralQuery(top ?? "");
+    if (result === seenResult.current) return;
+    seenResult.current = result;
+    const top = result?.candidates?.[0] ?? "";
+    patch({ suspected: top, mineralQuery: top });
   }, [result]);
   function fresh(next: string[]) {
     setPhotos(next);
+    w.setScanDraft(EMPTY_DRAFT);
     w.setScanResult(null);
     setSaved("");
   }

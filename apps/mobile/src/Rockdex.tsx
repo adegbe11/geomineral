@@ -11,22 +11,25 @@ import { useWorkspace } from "./state/Workspace";
 import { type, useTheme } from "./theme";
 
 const native = Platform.OS !== "web";
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 function Progress({ value, total }: { value: number; total: number }) {
   const { c, ui } = useTheme();
   const still = useReduceMotion();
   const r = 44,
     len = 2 * Math.PI * r;
+  // A plain Circle driven by a listener: animated SVG props leak attributes on web.
   const v = useRef(new Animated.Value(still ? value / total : 0)).current;
+  const [progress, setProgress] = useState(still ? value / total : 0);
   useEffect(() => {
+    const id = v.addListener(({ value: p }) => setProgress(p));
     Animated.timing(v, { toValue: value / total, duration: 900, useNativeDriver: false }).start();
+    return () => v.removeListener(id);
   }, [value, total]);
   return (
     <View style={{ width: 108, height: 108, alignItems: "center", justifyContent: "center" }}>
       <Svg width={108} height={108} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
         <Circle cx={54} cy={54} r={r} stroke={c.fill} strokeWidth={10} fill="none" />
-        <AnimatedCircle
+        <Circle
           cx={54}
           cy={54}
           r={r}
@@ -35,7 +38,7 @@ function Progress({ value, total }: { value: number; total: number }) {
           strokeLinecap="round"
           fill="none"
           strokeDasharray={`${len}`}
-          strokeDashoffset={v.interpolate({ inputRange: [0, 1], outputRange: [len, 0] })}
+          strokeDashoffset={len * (1 - progress)}
         />
       </Svg>
       <Text style={ui.title}>{value}</Text>

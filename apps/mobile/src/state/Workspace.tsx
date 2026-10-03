@@ -25,6 +25,23 @@ export const initialLocation: Location = {
 // Names that are only coordinates or placeholders get a reverse lookup.
 const UNNAMED =
   /^(-?\d+(\.\d+)?, ?-?\d+(\.\d+)?|Selected map location|Current location)$/;
+// The sample being written up on Scan; kept here so switching tabs never loses it.
+export type ScanDraft = {
+  title: string;
+  notes: string;
+  mineralQuery: string;
+  suspected: string;
+  audio: string | null;
+  gps: Location | null;
+};
+export const EMPTY_DRAFT: ScanDraft = {
+  title: "Field rock sample",
+  notes: "",
+  mineralQuery: "",
+  suspected: "",
+  audio: null,
+  gps: null,
+};
 function useWorkspaceState() {
   const [user, setUser] = useState<User | null>(null),
     [ready, setReady] = useState(false),
@@ -35,6 +52,7 @@ function useWorkspaceState() {
     [scanPhotos, setScanPhotos] = useState<string[]>([]),
     [scanResult, setScanResult] = useState<ScanResult | null>(null),
     [scanReview, setScanReview] = useState(false),
+    [scanDraft, setScanDraft] = useState<ScanDraft>(EMPTY_DRAFT),
     [pendingCount, setPendingCount] = useState(() => pending().length);
   const [location, setLocation] = useState<Location>(initialLocation),
     [polygon, setPolygon] = useState<number[][]>([]),
@@ -193,6 +211,7 @@ function useWorkspaceState() {
     setScanPhotos([]);
     setScanResult(null);
     setScanReview(false);
+    setScanDraft(EMPTY_DRAFT);
     setAnalysis(null);
     setRunId("");
     setStatus("");
@@ -218,6 +237,8 @@ function useWorkspaceState() {
     setScanResult,
     scanReview,
     setScanReview,
+    scanDraft,
+    setScanDraft,
     pendingCount,
     refreshPending: () => setPendingCount(pending().length),
     sync,

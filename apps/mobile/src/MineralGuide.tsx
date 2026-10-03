@@ -61,7 +61,8 @@ export default function MineralGuide({
     findMineral(initialQuery) ?? (exactSpecies ? asMineral(exactSpecies) : undefined);
   const [query, setQuery] = useState(exact ? "" : initialQuery),
     [group, setGroup] = useState("All"),
-    [selected, setSelected] = useState<Mineral | null>(exact ?? null),
+    // Pages visited inside the Guide, so Back retraces them; opened directly, the list is skipped.
+    [trail, setTrail] = useState<Mineral[]>(exact ? [exact] : []),
     [projects, setProjects] = useState<Project[] | null>(null),
     [title, setTitle] = useState(exact ? `${exact.name} field sample` : ""),
     [notes, setNotes] = useState(""),
@@ -70,8 +71,9 @@ export default function MineralGuide({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [saved, setSaved] = useState<"" | "online" | "offline">("");
+  const selected = trail.length ? trail[trail.length - 1] : null;
   function choose(x: Mineral) {
-    setSelected(x);
+    setTrail((t) => [...t, x]);
     setProjects(null);
     setError("");
     setSaved("");
@@ -133,7 +135,12 @@ export default function MineralGuide({
     <View style={ui.page}>
       <Header
         title={selected ? selected.name : "Mineral Guide"}
-        back={() => (selected ? (setSelected(null), setProjects(null), setError("")) : back())}
+        back={() => {
+          setProjects(null);
+          setError("");
+          if (!selected || (exact && trail.length === 1)) back();
+          else setTrail((t) => t.slice(0, -1));
+        }}
       />
       <ScrollView
         key={selected?.name ?? "list"}

@@ -141,8 +141,9 @@ test("native account saves a private project", async ({ page }) => {
   await expect(
     page.getByText("Recognition clues", { exact: true }),
   ).toBeVisible();
+  // Back from a mineral opened from the project returns to the project.
   await page.getByRole("button", { name: "Go back" }).click();
-  await page.getByRole("button", { name: "Go back" }).click();
+  await expect(page.getByText("QA quartz specimen", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Go back" }).click();
   await page.getByRole("tab", { name: "Scan", exact: true }).click();
   const chooserPromise = page.waitForEvent("filechooser");
@@ -282,6 +283,8 @@ test("mineral guide covers rocks and links look-alikes", async ({ page }) => {
   await expect(page.getByText("Where it forms", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Compare with Diorite" }).click();
   await expect(page.getByText("Diorite", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await expect(page.getByText("Granite", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Go back" }).click();
   await page.getByRole("button", { name: "All", exact: true }).click();
   await page.getByLabel("Search minerals").fill("fool's gold");
