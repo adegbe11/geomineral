@@ -1,0 +1,21 @@
+{
+  "name": "geomineral",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/web",
+    "typecheck": "npm run typecheck -w apps/web",
+    "test:e2e": "playwright test",
+    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/mobile/src/*.tsx\"",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/mobile/src/*.tsx\"",
+    "dev:mobile": "npm run web --prefix apps/mobile",
+    "test:mobile": "playwright test -c playwright.mobile.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "prettier": "^3.9.7"
+  }
+}

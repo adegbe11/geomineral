@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: geomineral
+      POSTGRES_USER: geomineral
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geomineral"]
+      interval: 5s
+      retries: 10
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    command: ["python", "scripts/migrate.py"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://geomineral:${POSTGRES_PASSWORD}@db/geomineral
+    depends_on:
+      db: { condition: service_healthy }
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    environment: &api-env
+      DATABASE_URL: postgresql+psycopg://geomineral:${POSTGRES_PASSWORD}@db/geomineral
+      APP_ENV: production
+      COOKIE_SECURE: "true"
+      ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the HTTPS site origin}
+      PROVIDER_USER_AGENT: ${PROVIDER_USER_AGENT:-GeoMineral/0.1}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    command: ["python", "-m", "geomineral.worker"]
+    environment: *api-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.web
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [api]
+volumes:
+  postgres-data:

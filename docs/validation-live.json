@@ -1,0 +1,1045 @@
+[
+  {
+    "location": {
+      "lat": -30.7489,
+      "lng": 121.4658,
+      "name": "Kalgoorlie",
+      "country_code": "AU"
+    },
+    "retrieved_at": "2026-09-16T20:42:10.606470+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 3,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "available",
+        "evidence_count": 28,
+        "occurrence_count": 20
+      }
+    ],
+    "assessments": [
+      {
+        "commodity": "Cobalt",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10038994:Cobalt",
+          "mrds:10183526:Cobalt",
+          "mrds:10304455:Cobalt"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Copper",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10038994:Copper",
+          "mrds:10304455:Copper"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Gold",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10038994:Gold",
+          "mrds:10084838:Gold",
+          "mrds:10085176:Gold",
+          "mrds:10085177:Gold",
+          "mrds:10085186:Gold",
+          "mrds:10085205:Gold",
+          "mrds:10085209:Gold",
+          "mrds:10085219:Gold",
+          "mrds:10107234:Gold",
+          "mrds:10183199:Gold",
+          "mrds:10183534:Gold",
+          "mrds:10231533:Gold",
+          "mrds:10231568:Gold",
+          "mrds:10231582:Gold",
+          "mrds:10256158:Gold",
+          "mrds:10280189:Gold"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Nickel",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10038994:Nickel",
+          "mrds:10096174:Nickel",
+          "mrds:10183526:Nickel",
+          "mrds:10232043:Nickel",
+          "mrds:10304455:Nickel"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Silver",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10183199:Silver",
+          "mrds:10231568:Silver"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      }
+    ],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": -33.85,
+      "lng": 116.06,
+      "name": "Greenbushes",
+      "country_code": "AU"
+    },
+    "retrieved_at": "2026-09-16T20:42:14.902133+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 3,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "available",
+        "evidence_count": 10,
+        "occurrence_count": 4
+      }
+    ],
+    "assessments": [
+      {
+        "commodity": "Clay",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:60000715:Clay"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Lithium",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10085250:Lithium",
+          "mrds:10239683:Lithium",
+          "mrds:60000715:Lithium"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Tantalum",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10085250:Tantalum",
+          "mrds:10159075:Tantalum",
+          "mrds:60000715:Tantalum"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Tin",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10085250:Tin",
+          "mrds:10159075:Tin",
+          "mrds:60000715:Tin"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      }
+    ],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": -22.315,
+      "lng": -68.929,
+      "name": "Calama",
+      "country_code": "CL"
+    },
+    "retrieved_at": "2026-09-16T20:42:19.409197+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 1,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "available",
+        "evidence_count": 71,
+        "occurrence_count": 60
+      }
+    ],
+    "assessments": [
+      {
+        "commodity": "Clay",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10065933:Clay"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Copper",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10057840:Copper",
+          "mrds:10057841:Copper",
+          "mrds:10057845:Copper",
+          "mrds:10057846:Copper",
+          "mrds:10057948:Copper",
+          "mrds:10057949:Copper",
+          "mrds:10057952:Copper",
+          "mrds:10057957:Copper",
+          "mrds:10057961:Copper",
+          "mrds:10057962:Copper",
+          "mrds:10057963:Copper",
+          "mrds:10057964:Copper",
+          "mrds:10057965:Copper",
+          "mrds:10057966:Copper",
+          "mrds:10057967:Copper",
+          "mrds:10057968:Copper",
+          "mrds:10057969:Copper",
+          "mrds:10057970:Copper",
+          "mrds:10057971:Copper",
+          "mrds:10057972:Copper",
+          "mrds:10057973:Copper",
+          "mrds:10057974:Copper",
+          "mrds:10057975:Copper",
+          "mrds:10057976:Copper",
+          "mrds:10057977:Copper",
+          "mrds:10068469:Copper",
+          "mrds:10068474:Copper",
+          "mrds:10068483:Copper",
+          "mrds:10079698:Copper",
+          "mrds:10079699:Copper",
+          "mrds:10085129:Copper",
+          "mrds:10104460:Copper",
+          "mrds:10106984:Copper",
+          "mrds:10158031:Copper",
+          "mrds:10182609:Copper",
+          "mrds:10231266:Copper",
+          "mrds:10279404:Copper"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Gold",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10057840:Gold",
+          "mrds:10057955:Gold",
+          "mrds:10057977:Gold",
+          "mrds:10079698:Gold",
+          "mrds:10182609:Gold",
+          "mrds:10279404:Gold"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Limestone",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10065712:Limestone",
+          "mrds:10065913:Limestone",
+          "mrds:10065922:Limestone",
+          "mrds:10065926:Limestone",
+          "mrds:10065927:Limestone"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Silver",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10057840:Silver",
+          "mrds:10057842:Silver",
+          "mrds:10057847:Silver",
+          "mrds:10057949:Silver",
+          "mrds:10057950:Silver",
+          "mrds:10057951:Silver",
+          "mrds:10057952:Silver",
+          "mrds:10057953:Silver",
+          "mrds:10057954:Silver",
+          "mrds:10057955:Silver",
+          "mrds:10057956:Silver",
+          "mrds:10057958:Silver",
+          "mrds:10057961:Silver",
+          "mrds:10057962:Silver",
+          "mrds:10057977:Silver",
+          "mrds:10079698:Silver",
+          "mrds:10104460:Silver",
+          "mrds:10104461:Silver",
+          "mrds:10104503:Silver",
+          "mrds:10182609:Silver",
+          "mrds:10279404:Silver"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Tin",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10079698:Tin"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      }
+    ],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": 53.3,
+      "lng": -1.8,
+      "name": "Peak District",
+      "country_code": "GB"
+    },
+    "retrieved_at": "2026-09-16T20:42:23.503359+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 3,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "available",
+        "evidence_count": 1,
+        "occurrence_count": 3
+      }
+    ],
+    "assessments": [
+      {
+        "commodity": "Clay",
+        "prospectivity": "Moderate",
+        "evidence_quality": "Limited",
+        "explanation": "A mapped clay-rich rock may justify characterization; industrial suitability is unknown.",
+        "evidence_ids": [
+          "macrostrat:3157472"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Iron",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10158388:Iron"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Limestone",
+        "prospectivity": "Moderate",
+        "evidence_quality": "Limited",
+        "explanation": "A source maps limestone, which warrants checking its composition and suitability locally.",
+        "evidence_ids": [
+          "macrostrat:3157472"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      }
+    ],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": 0.0,
+      "lng": -140.0,
+      "name": "Pacific control",
+      "country_code": null
+    },
+    "retrieved_at": "2026-09-16T20:42:27.703008+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "empty",
+        "evidence_count": 0,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "empty",
+        "evidence_count": 0,
+        "occurrence_count": 0
+      }
+    ],
+    "assessments": [],
+    "evidence_quality": "Very Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": 37.7,
+      "lng": -122.4,
+      "name": "San Francisco",
+      "country_code": "US"
+    },
+    "retrieved_at": "2026-09-16T20:42:31.915771+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 5,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "available",
+        "evidence_count": 28,
+        "occurrence_count": 147
+      }
+    ],
+    "assessments": [
+      {
+        "commodity": "Clay",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10109200:Clay",
+          "mrds:10162580:Clay",
+          "mrds:10259697:Clay"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Copper",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10027996:Copper",
+          "mrds:10036253:Copper",
+          "mrds:10076420:Copper",
+          "mrds:10102588:Copper",
+          "mrds:10102589:Copper",
+          "mrds:10259782:Copper",
+          "mrds:10284682:Copper"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Gold",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10035138:Gold",
+          "mrds:10102589:Gold",
+          "mrds:10106523:Gold",
+          "mrds:10115239:Gold",
+          "mrds:10164799:Gold",
+          "mrds:10189823:Gold",
+          "mrds:10286704:Gold"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Gypsum",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10077440:Gypsum",
+          "mrds:10213728:Gypsum"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Limestone",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10235210:Limestone",
+          "mrds:10286500:Limestone"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Silver",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10027996:Silver",
+          "mrds:10035139:Silver",
+          "mrds:10076420:Silver",
+          "mrds:10077432:Silver",
+          "mrds:10189458:Silver",
+          "mrds:10259782:Silver",
+          "mrds:10284682:Silver"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      }
+    ],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": 6.98,
+      "lng": 6.12,
+      "name": "Uhonmora development point",
+      "country_code": "NG"
+    },
+    "retrieved_at": "2026-09-16T20:42:36.202370+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 2,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "empty",
+        "evidence_count": 0,
+        "occurrence_count": 0
+      }
+    ],
+    "assessments": [],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  },
+  {
+    "location": {
+      "lat": 46.49,
+      "lng": -80.99,
+      "name": "Sudbury",
+      "country_code": "CA"
+    },
+    "retrieved_at": "2026-09-16T20:42:40.432589+00:00",
+    "providers": [
+      {
+        "id": "macrostrat",
+        "status": "available",
+        "evidence_count": 3,
+        "occurrence_count": 0
+      },
+      {
+        "id": "usgs-mrds",
+        "status": "available",
+        "evidence_count": 299,
+        "occurrence_count": 77
+      }
+    ],
+    "assessments": [
+      {
+        "commodity": "Cobalt",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10024459:Cobalt",
+          "mrds:10024460:Cobalt",
+          "mrds:10024465:Cobalt",
+          "mrds:10024467:Cobalt",
+          "mrds:10024468:Cobalt",
+          "mrds:10024469:Cobalt",
+          "mrds:10024470:Cobalt",
+          "mrds:10024471:Cobalt",
+          "mrds:10024472:Cobalt",
+          "mrds:10024478:Cobalt",
+          "mrds:10024572:Cobalt",
+          "mrds:10024573:Cobalt",
+          "mrds:10024579:Cobalt",
+          "mrds:10024581:Cobalt",
+          "mrds:10024582:Cobalt",
+          "mrds:10024584:Cobalt",
+          "mrds:10024585:Cobalt",
+          "mrds:10024587:Cobalt",
+          "mrds:10024589:Cobalt",
+          "mrds:10024591:Cobalt",
+          "mrds:10024592:Cobalt",
+          "mrds:10038440:Cobalt",
+          "mrds:10038443:Cobalt",
+          "mrds:10039218:Cobalt",
+          "mrds:10039295:Cobalt",
+          "mrds:10103678:Cobalt",
+          "mrds:10106771:Cobalt",
+          "mrds:10132975:Cobalt",
+          "mrds:10133386:Cobalt",
+          "mrds:10181911:Cobalt",
+          "mrds:10206525:Cobalt",
+          "mrds:10229957:Cobalt",
+          "mrds:10230319:Cobalt",
+          "mrds:10255386:Cobalt",
+          "mrds:10255626:Cobalt",
+          "mrds:10278652:Cobalt",
+          "mrds:10278729:Cobalt",
+          "mrds:10278754:Cobalt",
+          "mrds:10303649:Cobalt"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Copper",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10024459:Copper",
+          "mrds:10024460:Copper",
+          "mrds:10024465:Copper",
+          "mrds:10024467:Copper",
+          "mrds:10024468:Copper",
+          "mrds:10024469:Copper",
+          "mrds:10024470:Copper",
+          "mrds:10024471:Copper",
+          "mrds:10024472:Copper",
+          "mrds:10024478:Copper",
+          "mrds:10024572:Copper",
+          "mrds:10024573:Copper",
+          "mrds:10024579:Copper",
+          "mrds:10024581:Copper",
+          "mrds:10024582:Copper",
+          "mrds:10024584:Copper",
+          "mrds:10024585:Copper",
+          "mrds:10024587:Copper",
+          "mrds:10024589:Copper",
+          "mrds:10024591:Copper",
+          "mrds:10024592:Copper",
+          "mrds:10038419:Copper",
+          "mrds:10038422:Copper",
+          "mrds:10038423:Copper",
+          "mrds:10038425:Copper",
+          "mrds:10038427:Copper",
+          "mrds:10038431:Copper",
+          "mrds:10038433:Copper",
+          "mrds:10038434:Copper",
+          "mrds:10038437:Copper",
+          "mrds:10038439:Copper",
+          "mrds:10038440:Copper",
+          "mrds:10038442:Copper",
+          "mrds:10038443:Copper",
+          "mrds:10038444:Copper",
+          "mrds:10038445:Copper",
+          "mrds:10038446:Copper",
+          "mrds:10038447:Copper",
+          "mrds:10039215:Copper",
+          "mrds:10039216:Copper",
+          "mrds:10039218:Copper",
+          "mrds:10039221:Copper",
+          "mrds:10039295:Copper",
+          "mrds:10070065:Copper",
+          "mrds:10070066:Copper",
+          "mrds:10103675:Copper",
+          "mrds:10103677:Copper",
+          "mrds:10103678:Copper",
+          "mrds:10106771:Copper",
+          "mrds:10106875:Copper",
+          "mrds:10106903:Copper",
+          "mrds:10109557:Copper",
+          "mrds:10109562:Copper",
+          "mrds:10132975:Copper",
+          "mrds:10133077:Copper",
+          "mrds:10133386:Copper",
+          "mrds:10158214:Copper",
+          "mrds:10158455:Copper",
+          "mrds:10206525:Copper",
+          "mrds:10206559:Copper",
+          "mrds:10229957:Copper",
+          "mrds:10230319:Copper",
+          "mrds:10240558:Copper",
+          "mrds:10255386:Copper",
+          "mrds:10255626:Copper",
+          "mrds:10278652:Copper",
+          "mrds:10278702:Copper",
+          "mrds:10278729:Copper",
+          "mrds:10278754:Copper",
+          "mrds:10278863:Copper",
+          "mrds:10303649:Copper",
+          "mrds:10305466:Copper"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Gold",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10024459:Gold",
+          "mrds:10024460:Gold",
+          "mrds:10024465:Gold",
+          "mrds:10024467:Gold",
+          "mrds:10024468:Gold",
+          "mrds:10024469:Gold",
+          "mrds:10024470:Gold",
+          "mrds:10024471:Gold",
+          "mrds:10024472:Gold",
+          "mrds:10024478:Gold",
+          "mrds:10024572:Gold",
+          "mrds:10024573:Gold",
+          "mrds:10024579:Gold",
+          "mrds:10024581:Gold",
+          "mrds:10024582:Gold",
+          "mrds:10024584:Gold",
+          "mrds:10024585:Gold",
+          "mrds:10024587:Gold",
+          "mrds:10024589:Gold",
+          "mrds:10024591:Gold",
+          "mrds:10024592:Gold",
+          "mrds:10038419:Gold",
+          "mrds:10038423:Gold",
+          "mrds:10038425:Gold",
+          "mrds:10038427:Gold",
+          "mrds:10038431:Gold",
+          "mrds:10038433:Gold",
+          "mrds:10038434:Gold",
+          "mrds:10038437:Gold",
+          "mrds:10038439:Gold",
+          "mrds:10038440:Gold",
+          "mrds:10038442:Gold",
+          "mrds:10038443:Gold",
+          "mrds:10038444:Gold",
+          "mrds:10038445:Gold",
+          "mrds:10038446:Gold",
+          "mrds:10038447:Gold",
+          "mrds:10039215:Gold",
+          "mrds:10039218:Gold",
+          "mrds:10039221:Gold",
+          "mrds:10039295:Gold",
+          "mrds:10103675:Gold",
+          "mrds:10103677:Gold",
+          "mrds:10103678:Gold",
+          "mrds:10106771:Gold",
+          "mrds:10106875:Gold",
+          "mrds:10109557:Gold",
+          "mrds:10109562:Gold",
+          "mrds:10132975:Gold",
+          "mrds:10206525:Gold",
+          "mrds:10206559:Gold",
+          "mrds:10229957:Gold",
+          "mrds:10230319:Gold",
+          "mrds:10255386:Gold",
+          "mrds:10255626:Gold",
+          "mrds:10278652:Gold",
+          "mrds:10278729:Gold",
+          "mrds:10278754:Gold",
+          "mrds:10278863:Gold"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Iron",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10230377:Iron",
+          "mrds:10279007:Iron",
+          "mrds:10303646:Iron"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Nickel",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10024459:Nickel",
+          "mrds:10024460:Nickel",
+          "mrds:10024465:Nickel",
+          "mrds:10024467:Nickel",
+          "mrds:10024468:Nickel",
+          "mrds:10024469:Nickel",
+          "mrds:10024470:Nickel",
+          "mrds:10024471:Nickel",
+          "mrds:10024472:Nickel",
+          "mrds:10024478:Nickel",
+          "mrds:10024572:Nickel",
+          "mrds:10024573:Nickel",
+          "mrds:10024579:Nickel",
+          "mrds:10024581:Nickel",
+          "mrds:10024582:Nickel",
+          "mrds:10024584:Nickel",
+          "mrds:10024585:Nickel",
+          "mrds:10024587:Nickel",
+          "mrds:10024589:Nickel",
+          "mrds:10024591:Nickel",
+          "mrds:10024592:Nickel",
+          "mrds:10038419:Nickel",
+          "mrds:10038422:Nickel",
+          "mrds:10038423:Nickel",
+          "mrds:10038425:Nickel",
+          "mrds:10038427:Nickel",
+          "mrds:10038431:Nickel",
+          "mrds:10038433:Nickel",
+          "mrds:10038434:Nickel",
+          "mrds:10038437:Nickel",
+          "mrds:10038439:Nickel",
+          "mrds:10038440:Nickel",
+          "mrds:10038442:Nickel",
+          "mrds:10038443:Nickel",
+          "mrds:10038444:Nickel",
+          "mrds:10038445:Nickel",
+          "mrds:10038446:Nickel",
+          "mrds:10038447:Nickel",
+          "mrds:10039215:Nickel",
+          "mrds:10039216:Nickel",
+          "mrds:10039218:Nickel",
+          "mrds:10039221:Nickel",
+          "mrds:10039295:Nickel",
+          "mrds:10070065:Nickel",
+          "mrds:10070066:Nickel",
+          "mrds:10103675:Nickel",
+          "mrds:10103677:Nickel",
+          "mrds:10103678:Nickel",
+          "mrds:10106771:Nickel",
+          "mrds:10106875:Nickel",
+          "mrds:10106903:Nickel",
+          "mrds:10109557:Nickel",
+          "mrds:10109562:Nickel",
+          "mrds:10132975:Nickel",
+          "mrds:10133077:Nickel",
+          "mrds:10133101:Nickel",
+          "mrds:10133386:Nickel",
+          "mrds:10158214:Nickel",
+          "mrds:10181911:Nickel",
+          "mrds:10206525:Nickel",
+          "mrds:10206559:Nickel",
+          "mrds:10229957:Nickel",
+          "mrds:10230319:Nickel",
+          "mrds:10230377:Nickel",
+          "mrds:10240558:Nickel",
+          "mrds:10255386:Nickel",
+          "mrds:10255626:Nickel",
+          "mrds:10278652:Nickel",
+          "mrds:10278702:Nickel",
+          "mrds:10278729:Nickel",
+          "mrds:10278754:Nickel",
+          "mrds:10303649:Nickel",
+          "mrds:10305466:Nickel"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      },
+      {
+        "commodity": "Silver",
+        "prospectivity": "Insufficient evidence",
+        "evidence_quality": "Very Limited",
+        "explanation": "Nearby reported occurrences provide regional context, but do not establish favorable conditions at the selected location.",
+        "evidence_ids": [
+          "mrds:10024459:Silver",
+          "mrds:10024460:Silver",
+          "mrds:10024465:Silver",
+          "mrds:10024467:Silver",
+          "mrds:10024468:Silver",
+          "mrds:10024469:Silver",
+          "mrds:10024470:Silver",
+          "mrds:10024471:Silver",
+          "mrds:10024472:Silver",
+          "mrds:10024478:Silver",
+          "mrds:10024572:Silver",
+          "mrds:10024573:Silver",
+          "mrds:10024579:Silver",
+          "mrds:10024581:Silver",
+          "mrds:10024582:Silver",
+          "mrds:10024584:Silver",
+          "mrds:10024585:Silver",
+          "mrds:10024587:Silver",
+          "mrds:10024589:Silver",
+          "mrds:10024591:Silver",
+          "mrds:10024592:Silver",
+          "mrds:10038419:Silver",
+          "mrds:10038422:Silver",
+          "mrds:10038423:Silver",
+          "mrds:10038425:Silver",
+          "mrds:10038427:Silver",
+          "mrds:10038431:Silver",
+          "mrds:10038433:Silver",
+          "mrds:10038434:Silver",
+          "mrds:10038440:Silver",
+          "mrds:10038443:Silver",
+          "mrds:10038445:Silver",
+          "mrds:10038446:Silver",
+          "mrds:10038447:Silver",
+          "mrds:10039215:Silver",
+          "mrds:10039295:Silver",
+          "mrds:10103675:Silver",
+          "mrds:10103677:Silver",
+          "mrds:10103678:Silver",
+          "mrds:10106771:Silver",
+          "mrds:10109557:Silver",
+          "mrds:10109562:Silver",
+          "mrds:10132975:Silver",
+          "mrds:10206525:Silver",
+          "mrds:10206559:Silver",
+          "mrds:10229957:Silver",
+          "mrds:10230319:Silver",
+          "mrds:10255386:Silver",
+          "mrds:10255626:Silver",
+          "mrds:10278652:Silver",
+          "mrds:10278729:Silver",
+          "mrds:10278754:Silver",
+          "mrds:10278863:Silver"
+        ],
+        "missing": [
+          "No verified local assay results",
+          "No drilling evidence",
+          "No verified local structural or alteration model"
+        ]
+      }
+    ],
+    "evidence_quality": "Limited",
+    "model_version": "screening-0.1.0"
+  }
+]

@@ -1,0 +1,10 @@
+node_modules
+apps/mobile/node_modules
+package-lock.json
+apps/mobile/package-lock.json
+.next
+apps/web/.next
+.venv
+.data
+test-results
+docs/validation-live.json

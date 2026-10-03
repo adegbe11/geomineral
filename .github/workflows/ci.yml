@@ -1,0 +1,43 @@
+name: Verify GeoMineral
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: npm ci
+      - run: pip install -r services/api/requirements.lock.txt
+      - run: ruff check services/api
+      - run: ruff format --check services/api
+      - run: pytest -q
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser integration tests
+        env:
+          PYTHONPATH: services/api
+          ENABLE_LIVE_PROVIDERS: 'false'
+          PLAYWRIGHT_CHANNEL: chromium
+        run: |
+          uvicorn geomineral.main:app --host 127.0.0.1 --port 8000 &
+          npm run start -w apps/web &
+          node scripts/wait-for-service.mjs
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: browser-results, path: test-results }
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci --prefix apps/mobile
+      - run: npm run typecheck --prefix apps/mobile
+      - run: node node_modules/expo/bin/cli export --platform ios --output-dir dist
+        working-directory: apps/mobile
+        env:
+          EXPO_OFFLINE: '1'
