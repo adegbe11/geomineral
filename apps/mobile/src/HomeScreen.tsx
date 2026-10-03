@@ -12,6 +12,7 @@ import { EASE_OUT, EASE_REVEAL, FadeIn, Float, Pressy, SPRING_PRESS, useReduceMo
 import { SPECIES_COUNT } from "./species";
 import { useWorkspace } from "./state/Workspace";
 import { ratingColor, ratingLabel, type } from "./theme";
+import type { Location } from "./types";
 
 const native = Platform.OS !== "web";
 // Home always sits on the planet, like Apple Weather: one fixed glass-on-dark palette.
@@ -115,7 +116,7 @@ export default function HomeScreen({
 }: {
   /** True while another screen is stacked on top of Home. */
   covered: boolean;
-  analyze: () => void;
+  analyze: (place: Location) => void;
   guide: (name?: string) => void;
   identify: () => void;
   openRecent: (id: string) => void;
@@ -129,16 +130,27 @@ export default function HomeScreen({
   const label = useRef(new Animated.Value(1)).current;
   const zoom = useRef(new Animated.Value(1)).current;
   const panel = useRef(new Animated.Value(0)).current;
-  function start() {
+  const [message, setMessage] = useState("");
+  async function start() {
     if (loading) return;
     setLoading(true);
-    if (still) return analyze();
+    setMessage("");
+    let place: Location;
+    try {
+      // No place chosen yet: use where the phone is.
+      place = await w.ensurePlace();
+    } catch (e) {
+      setLoading(false);
+      setMessage((e as Error).message);
+      return;
+    }
+    if (still) return analyze(place);
     Animated.parallel([
       Animated.timing(label, { toValue: 0, duration: 150, easing: EASE_OUT, useNativeDriver: native }),
       Animated.timing(zoom, { toValue: 1.05, duration: 700, easing: EASE_OUT, useNativeDriver: native }),
       Animated.timing(panel, { toValue: 1, duration: 400, easing: EASE_REVEAL, useNativeDriver: native }),
     ]).start();
-    setTimeout(analyze, 260);
+    setTimeout(() => analyze(place), 260);
   }
   useEffect(() => {
     if (covered || !loading) return;
@@ -215,7 +227,11 @@ export default function HomeScreen({
               }}
             >
             <Glass style={{ padding: 14, gap: 12 }}>
-              <PlaceSearch onSelect={w.selectLocation} tone="glass" current={w.location.name} />
+              <PlaceSearch
+                onSelect={w.selectLocation}
+                tone="glass"
+                current={w.hasPlace ? w.location.name : undefined}
+              />
               <Pressy
                 accessibilityRole="button"
                 accessibilityLabel="Analyze Location"
@@ -237,6 +253,11 @@ export default function HomeScreen({
                   {loading && <ActivityIndicator color={G.onTint} />}
                 </Animated.View>
               </Pressy>
+              {!!message && (
+                <Text accessibilityRole="alert" style={{ ...type.footnote, color: "#FFD58A", textAlign: "center" }}>
+                  {message}
+                </Text>
+              )}
             </Glass>
             </Animated.View>
           </FadeIn>

@@ -27,6 +27,7 @@ export default function NativeMap({
   selectedSite,
   onSite,
   interactive = true,
+  world = false,
 }: MapProps) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -44,7 +45,7 @@ export default function NativeMap({
     const m = new maplibregl.Map({
       container: host.current,
       center: [location.lng, location.lat],
-      zoom: radiusKm ? 9 : 11,
+      zoom: world ? 1.3 : radiusKm ? 9 : 11,
       attributionControl: false,
       interactive,
       style: {
@@ -137,6 +138,10 @@ export default function NativeMap({
   useEffect(() => {
     const m = map.current;
     if (!m) return;
+    if (world) {
+      m.jumpTo({ center: [0, 20], zoom: 1.3 });
+      return;
+    }
     if (radiusKm) {
       const ring = circle(location.lng, location.lat, radiusKm);
       const lngs = ring.map((p) => p[0]),
@@ -160,7 +165,7 @@ export default function NativeMap({
     return () => {
       marker.remove();
     };
-  }, [location, satellite, radiusKm, interactive, loaded]);
+  }, [location, satellite, radiusKm, interactive, loaded, world]);
   useEffect(() => {
     const m = map.current;
     if (!m || !loaded || !m.getSource("sites")) return;

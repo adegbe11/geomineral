@@ -280,6 +280,7 @@ export function Scanner({
   async function record(p: Project) {
     setBusy(true);
     try {
+      const where = gps ?? (await w.ensurePlace());
       const { queued } = await saveRecord(p, {
         kind: "sample",
         title,
@@ -292,7 +293,7 @@ export function Scanner({
           ]
             .filter(Boolean)
             .join("\n") || "Visual field observation; identification not confirmed.",
-        location: gps ?? w.location,
+        location: where,
         rock_type: suspected || "Unidentified",
         method: result
           ? "AI visual suggestion; unconfirmed"
@@ -491,7 +492,7 @@ export function Scanner({
             <View style={[ui.row, { gap: 8 }]}>
               <MapPin size={15} color={c.tint} />
               <Text style={[ui.caption, { flex: 1 }]} numberOfLines={1}>
-                {gps ? `${gps.name} · ${coordinates(gps)}` : w.location.name}
+                {gps ? `${gps.name} · ${coordinates(gps)}` : w.hasPlace ? w.location.name : "No location yet"}
               </Text>
               <Pressable accessibilityRole="button" onPress={pinGps} hitSlop={8}>
                 {locating ? (

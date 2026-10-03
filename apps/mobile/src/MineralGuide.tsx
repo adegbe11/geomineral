@@ -102,11 +102,12 @@ export default function MineralGuide({
     setBusy(true);
     setError("");
     try {
+      const where = await w.ensurePlace();
       const { queued } = await saveRecord(p, {
         kind: "sample",
         title: title.trim(),
         description: `${confirmed ? "Lab-confirmed (user reported)" : "Suspected; not confirmed"} mineral: ${selected.name}. ${notes.trim() || "No additional observations recorded."}${confirmed ? ` Laboratory reference: ${reference.trim()}.` : ""}`,
-        location: w.location,
+        location: where,
         rock_type: selected.name,
         method: confirmed ? "Lab-confirmed (user reported)" : "Suspected visual identification",
         chain_of_custody: confirmed ? reference.trim() : "Not recorded",

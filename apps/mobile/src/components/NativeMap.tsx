@@ -14,6 +14,8 @@ export type MapProps = {
   selectedSite?: string;
   onSite?: (site: Occurrence) => void;
   interactive?: boolean;
+  /** No place chosen yet: show the whole world without a pin. */
+  world?: boolean;
 };
 // Fits the search circle with a little margin.
 export const spanFor = (radiusKm = 25) => (radiusKm / 111) * 2.4;
@@ -28,9 +30,10 @@ export default function NativeMap({
   selectedSite,
   onSite,
   interactive = true,
+  world = false,
 }: MapProps) {
   const ref = useRef<MapView>(null);
-  const span = radiusKm ? spanFor(radiusKm) : 0.15;
+  const span = world ? 140 : radiusKm ? spanFor(radiusKm) : 0.15;
   useEffect(() => {
     ref.current?.animateToRegion(
       {
@@ -108,10 +111,12 @@ export default function NativeMap({
           />
         </Marker>
       ))}
-      <Marker
-        coordinate={{ latitude: location.lat, longitude: location.lng }}
-        pinColor="#0B5D2D"
-      />
+      {!world && (
+        <Marker
+          coordinate={{ latitude: location.lat, longitude: location.lng }}
+          pinColor="#0B5D2D"
+        />
+      )}
       {polygon.length >= 3 && (
         <Polygon
           coordinates={polygon.map(([lng, lat]) => ({

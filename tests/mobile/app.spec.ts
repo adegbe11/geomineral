@@ -99,6 +99,7 @@ test("native account saves a private project", async ({ page }) => {
   await page
     .getByLabel("Project name", { exact: true })
     .fill("Synthetic mobile QA project");
+  { const mine = page.getByRole("button", { name: "Use My Location" }); if (await mine.isVisible()) await mine.click(); }
   await page.getByRole("button", { name: "Save Project", exact: true }).click();
   await page.getByText("Synthetic mobile QA project", { exact: true }).click();
   await expect(page.getByText("No samples yet", { exact: true })).toBeVisible();
@@ -258,11 +259,13 @@ test("projects can be renamed and deleted", async ({ page }) => {
   await page.getByRole("button", { name: "Create Account", exact: true }).click();
   await page.getByRole("button", { name: "Create Project", exact: true }).click();
   await page.getByLabel("Project name", { exact: true }).fill("Ridge survey");
+  { const mine = page.getByRole("button", { name: "Use My Location" }); if (await mine.isVisible()) await mine.click(); }
   await page.getByRole("button", { name: "Save Project", exact: true }).click();
   await expect(page.getByText("0 samples", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Ridge survey" }).click();
   await page.getByRole("button", { name: "Rename project" }).click();
   await page.getByLabel("Project name", { exact: true }).fill("North ridge");
+  { const mine = page.getByRole("button", { name: "Use My Location" }); if (await mine.isVisible()) await mine.click(); }
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("North ridge", { exact: true }).first()).toBeVisible();
   await page.screenshot({ path: "test-results/project.png" });
@@ -324,6 +327,7 @@ test("rockdex collects a saved mineral and unlocks a badge", async ({ page }) =>
   await page.getByRole("button", { name: "Create Account", exact: true }).click();
   await page.getByRole("button", { name: "Create Project", exact: true }).click();
   await page.getByLabel("Project name", { exact: true }).fill("Cabinet test");
+  { const mine = page.getByRole("button", { name: "Use My Location" }); if (await mine.isVisible()) await mine.click(); }
   await page.getByRole("button", { name: "Save Project", exact: true }).click();
   await page.getByRole("tab", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: "Mineral Guide", exact: true }).click();
@@ -355,6 +359,7 @@ test("samples saved offline sync when back online", async ({ page, context }) =>
   await page.getByRole("button", { name: "Create Account", exact: true }).click();
   await page.getByRole("button", { name: "Create Project", exact: true }).click();
   await page.getByLabel("Project name", { exact: true }).fill("Cave survey");
+  { const mine = page.getByRole("button", { name: "Use My Location" }); if (await mine.isVisible()) await mine.click(); }
   await page.getByRole("button", { name: "Save Project", exact: true }).click();
   await expect(page.getByRole("button", { name: "Cave survey" })).toBeVisible();
   await page.getByRole("tab", { name: "Home", exact: true }).click();

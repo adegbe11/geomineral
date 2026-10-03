@@ -20,6 +20,7 @@ import { Camera, Compass, Folder, Home, UserRound, X } from "lucide-react-native
 import { Brand, Button, Header } from "./components/Primitives";
 import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
 import OrbitingEarth from "./components/OrbitingEarth";
+import PlaceSearch from "./components/PlaceSearch";
 import HomeScreen from "./HomeScreen";
 import IdentifyScreen from "./IdentifyScreen";
 import MineralGuide from "./MineralGuide";
@@ -187,7 +188,7 @@ function Shell() {
       setAuth(true);
       return;
     }
-    setName(w.location.name.split(",")[0] + " exploration");
+    setName(w.hasPlace ? w.location.name.split(",")[0] + " exploration" : "");
     setSaving(true);
     setError("");
   };
@@ -343,7 +344,7 @@ function Shell() {
             {w.tab === "Home" ? (
               <HomeScreen
                 covered={stack.length > 0}
-                analyze={() => analyze(undefined, "bottom")}
+                analyze={(place) => analyze(place, "bottom")}
                 guide={openGuide}
                 identify={() => identify()}
                 openRecent={(id) => {
@@ -352,7 +353,7 @@ function Shell() {
                 }}
               />
             ) : w.tab === "Explore" ? (
-              <Explore analyze={() => analyze()} save={save} results={() => push({ name: "analysis" })} />
+              <Explore analyze={(place) => analyze(place)} save={save} results={() => push({ name: "analysis" })} />
             ) : w.tab === "Scan" ? (
               <Scanner signIn={() => setAuth(true)} guide={openGuide} testIt={identify} />
             ) : w.tab === "Projects" ? (
@@ -463,7 +464,18 @@ function Shell() {
                   onChangeText={setName}
                   style={ui.field}
                 />
-                <Text style={[ui.small, { marginLeft: 4 }]}>{w.location.name}</Text>
+                {w.hasPlace ? (
+                  <Text style={[ui.small, { marginLeft: 4 }]}>{w.location.name}</Text>
+                ) : (
+                  <>
+                    <PlaceSearch onSelect={w.selectLocation} />
+                    <Button
+                      plain
+                      title="Use My Location"
+                      onPress={() => void w.locateMe().catch((e) => setError((e as Error).message))}
+                    />
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -494,7 +506,7 @@ function Shell() {
             <Button
               title={saving ? "Save Project" : register ? "Create Account" : "Sign In"}
               busy={busy}
-              disabled={saving ? !name.trim() : !email || !password}
+              disabled={saving ? !name.trim() || !w.hasPlace : !email || !password}
               onPress={saving ? saveProject : login}
             />
             {!saving && (

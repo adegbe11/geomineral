@@ -9,5 +9,8 @@ export default defineConfig({
     ...devices["iPhone 13"],
     defaultBrowserType: "chromium",
     trace: "retain-on-failure",
+    // The app starts with no place; Analyze and saves use the device position.
+    geolocation: { latitude: -30.7489, longitude: 121.4658 },
+    permissions: ["geolocation"],
   },
 });

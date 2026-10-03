@@ -45,7 +45,7 @@ import {
   type,
   useTheme,
 } from "./theme";
-import type { Analysis, Assessment, Occurrence } from "./types";
+import type { Analysis, Assessment, Location, Occurrence } from "./types";
 
 const native = Platform.OS !== "web";
 const RADII = [10, 25, 50];
@@ -146,7 +146,7 @@ export function Explore({
   save,
   results,
 }: {
-  analyze: () => void;
+  analyze: (place: Location) => void;
   save: () => void;
   results: () => void;
 }) {
@@ -189,10 +189,11 @@ export function Explore({
       <View style={StyleSheet.absoluteFill}>
         <NativeMap
           location={w.location}
+          world={!w.hasPlace}
           satellite={satellite}
           polygon={w.polygon}
           drawing={drawing}
-          radiusKm={a?.radius_km ?? w.radius}
+          radiusKm={w.hasPlace ? (a?.radius_km ?? w.radius) : undefined}
           sites={a?.occurrences}
           selectedSite={site?.id}
           onSite={(o) => {
@@ -300,18 +301,22 @@ export function Explore({
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={ui.h3} numberOfLines={2}>
-                    {w.location.name}
+                    {w.hasPlace ? w.location.name : "Drop a pin anywhere"}
                   </Text>
-                  <Text style={ui.small}>{coordinates(w.location)}</Text>
+                  <Text style={ui.small}>
+                    {w.hasPlace ? coordinates(w.location) : "Tap the map, search, or use your location"}
+                  </Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Save location"
-                  onPress={save}
-                  hitSlop={10}
-                >
-                  <Text style={{ ...type.subhead, fontWeight: "600", color: c.tint }}>Save</Text>
-                </Pressable>
+                {w.hasPlace && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Save location"
+                    onPress={save}
+                    hitSlop={10}
+                  >
+                    <Text style={{ ...type.subhead, fontWeight: "600", color: c.tint }}>Save</Text>
+                  </Pressable>
+                )}
               </View>
               {!!error && <Text style={ui.error}>{error}</Text>}
               {a ? (
@@ -345,7 +350,14 @@ export function Explore({
                   <Button
                     title="Analyze Location"
                     busy={w.status === "queued" || w.status === "processing"}
-                    onPress={analyze}
+                    onPress={async () => {
+                      setError("");
+                      try {
+                        analyze(await w.ensurePlace());
+                      } catch (e) {
+                        setError((e as Error).message);
+                      }
+                    }}
                   />
                 </>
               )}

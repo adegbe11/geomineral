@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { AppState } from "react-native";
+import * as LocationService from "expo-location";
 import { flush, pending } from "../services/outbox";
 import {
   api,
@@ -16,12 +17,8 @@ import {
   setStored,
 } from "../services/api";
 import type { Analysis, Location, Run, ScanResult, Tab, User } from "../types";
-export const initialLocation: Location = {
-  lat: 6.98,
-  lng: 6.12,
-  name: "Uhonmora, Edo State, Nigeria",
-  country_code: "NG",
-};
+// No place until the user searches, taps the map or shares their location.
+export const NO_PLACE: Location = { lat: 20, lng: 0, name: "" };
 // Names that are only coordinates or placeholders get a reverse lookup.
 const UNNAMED =
   /^(-?\d+(\.\d+)?, ?-?\d+(\.\d+)?|Selected map location|Current location)$/;
@@ -54,7 +51,7 @@ function useWorkspaceState() {
     [scanReview, setScanReview] = useState(false),
     [scanDraft, setScanDraft] = useState<ScanDraft>(EMPTY_DRAFT),
     [pendingCount, setPendingCount] = useState(() => pending().length);
-  const [location, setLocation] = useState<Location>(initialLocation),
+  const [location, setLocation] = useState<Location>(NO_PLACE),
     [polygon, setPolygon] = useState<number[][]>([]),
     [analysis, setAnalysis] = useState<Analysis | null>(null),
     [runId, setRunId] = useState(""),
@@ -103,6 +100,21 @@ function useWorkspaceState() {
       sub.remove();
     };
   }, [user]);
+  const hasPlace = location.name !== "";
+  /** Asks for the device position and makes it the selected place. */
+  async function locateMe(): Promise<Location> {
+    const permission = await LocationService.requestForegroundPermissionsAsync();
+    if (!permission.granted)
+      throw new Error("Location is off. Search for a place or tap the map.");
+    const p = await LocationService.getCurrentPositionAsync({
+      accuracy: LocationService.Accuracy.Balanced,
+    });
+    const point = { lat: p.coords.latitude, lng: p.coords.longitude, name: "Current location" };
+    selectLocation(point);
+    return point;
+  }
+  /** The selected place, or the device position when nothing is selected yet. */
+  const ensurePlace = () => (hasPlace ? Promise.resolve(location) : locateMe());
   function selectLocation(point: Location) {
     generation.current++;
     if (timer.current) clearTimeout(timer.current);
@@ -228,6 +240,9 @@ function useWorkspaceState() {
     professional,
     setProfessional,
     location,
+    hasPlace,
+    locateMe,
+    ensurePlace,
     selectLocation,
     radius,
     setRadius,
