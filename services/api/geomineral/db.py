@@ -46,6 +46,8 @@ class AnalysisRun(Base):
     created_at: Mapped[str] = mapped_column(String(40), default=now)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     claimed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # JSON {source_id: status} written as each evidence source finishes.
+    progress: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Project(Base):
@@ -74,3 +76,13 @@ class DatasetState(Base):
 def get_db():
     with SessionLocal() as db:
         yield db
+
+
+def upgrade_local(bind) -> None:
+    """Development databases created before a column existed get it added in place."""
+    from sqlalchemy import inspect, text
+
+    columns = {c["name"] for c in inspect(bind).get_columns("analysis_runs")}
+    if "progress" not in columns:
+        with bind.begin() as conn:
+            conn.execute(text("ALTER TABLE analysis_runs ADD COLUMN progress TEXT"))

@@ -28,6 +28,7 @@ export default function NativeMap({
   onSite,
   interactive = true,
   world = false,
+  geology,
 }: MapProps) {
   const host = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -107,6 +108,20 @@ export default function NativeMap({
         type: "fill",
         source: "area",
         paint: { "fill-color": "#D6B65D", "fill-opacity": 0.3 },
+      });
+      m.addSource("units", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addLayer({
+        id: "units",
+        type: "fill",
+        source: "units",
+        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42, "fill-outline-color": ["get", "color"] },
+      });
+      m.addSource("faults", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addLayer({
+        id: "faults",
+        type: "line",
+        source: "faults",
+        paint: { "line-color": "#FF5A4E", "line-width": 1.6, "line-opacity": 0.95 },
       });
       m.addSource("sites", {
         type: "geojson",
@@ -212,7 +227,23 @@ export default function NativeMap({
         geometry: { type: "Point", coordinates: [o.lng, o.lat] },
       })),
     });
-  }, [loaded, location, radiusKm, polygon, sites, selectedSite]);
+    (m.getSource("units") as maplibregl.GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: (geology?.units ?? []).map((u) => ({
+        type: "Feature",
+        properties: { color: u.color, name: u.name },
+        geometry: { type: "MultiPolygon", coordinates: u.rings.map((r) => [r]) },
+      })),
+    });
+    (m.getSource("faults") as maplibregl.GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: (geology?.faults ?? []).map((f) => ({
+        type: "Feature",
+        properties: { type: f.type },
+        geometry: { type: "MultiLineString", coordinates: f.paths },
+      })),
+    });
+  }, [loaded, location, radiusKm, polygon, sites, selectedSite, geology]);
   return (
     <View style={{ flex: 1 }}>
       <div ref={host} style={{ position: "absolute", inset: 0 }} />

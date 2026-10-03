@@ -10,3 +10,4 @@ pytest>=8,<10
 pytest-asyncio>=0.25,<2
 ruff>=0.11,<1
 Pillow>=11.3,<13
+mapbox-vector-tile>=2.2,<3

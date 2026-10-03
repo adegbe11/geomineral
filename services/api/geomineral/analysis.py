@@ -48,6 +48,24 @@ ROCK_RULES = [
 ]
 RANK = {Category.HIGH: 3, Category.MODERATE: 2, Category.LOW: 1, Category.INSUFFICIENT: 0}
 NEAR_KM = 5
+# Ore fluids often travel along faults; these commodities are commonly fault-controlled.
+STRUCTURAL = {
+    "Gold",
+    "Silver",
+    "Copper",
+    "Tin",
+    "Lithium",
+    "Tantalum",
+    "Niobium",
+    "Lead",
+    "Zinc",
+    "Tungsten",
+    "Uranium",
+    "Antimony",
+    "Molybdenum",
+    "Fluorite",
+    "Barite",
+}
 
 
 def _rock_text(e: Evidence) -> str:
@@ -79,6 +97,7 @@ def _km(m: float) -> str:
 
 def assess(evidence: list[Evidence]) -> list[Assessment]:
     geology = [e for e in evidence if e.evidence_type == "mapped_geology"]
+    fault = next((e for e in evidence if e.evidence_type == "structure"), None)
     rocks = _rock_matches(geology)
     candidates = {e.commodity for e in evidence if e.commodity} | set(rocks)
     results = []
@@ -120,6 +139,12 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
             score += 1
         if papers and not studied and score == 0:
             score = 1
+        # A nearby fault strengthens existing evidence; it never creates a candidate alone.
+        fault_near = bool(
+            score and commodity in STRUCTURAL and fault and fault.raw_value["nearest_km"] <= NEAR_KM
+        )
+        if fault_near:
+            score += 1
         if negative:
             category = Category.INSUFFICIENT
         elif score >= 4:
@@ -162,6 +187,11 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                     f"Mentioned in {mentions} {'more ' if studied else ''}"
                     f"{'paper' if mentions == 1 else 'papers'} about {place}."
                 )
+        if fault_near:
+            parts.append(
+                f"A mapped fault {fault.raw_value['nearest_km']:.1f} km away could have channelled "
+                f"{commodity.lower()}-bearing fluids."
+            )
         if negative:
             parts.append("Contradictory evidence is present and needs professional review.")
 
@@ -178,7 +208,9 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 prospectivity=category,
                 evidence_quality=quality,
                 explanation=" ".join(parts) or "Reported in a connected source.",
-                evidence_ids=[e.id for e in related] + (rock["ids"] if rock else []),
+                evidence_ids=[e.id for e in related]
+                + (rock["ids"] if rock else [])
+                + ([fault.id] if fault_near else []),
                 missing=MISSING,
                 score=score,
                 site_count=len(sites),
@@ -203,7 +235,12 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
         [o for p in providers for o in p.occurrences], key=lambda o: o["distance_m"]
     )
     assessments = assess(evidence)
-    snapshots = [provider.model_dump() for provider in providers]
+    # Map layers are large and derived; keep them out of the fingerprinted snapshots.
+    snapshots = [provider.model_dump(exclude={"layers"}) for provider in providers]
+    layers: dict = {}
+    for provider in providers:
+        for name, items in provider.layers.items():
+            layers.setdefault(name, []).extend(items)
     fingerprint = hashlib.sha256(
         json.dumps(
             {"request": request.model_dump(), "model": MODEL_VERSION, "snapshots": snapshots},
@@ -265,6 +302,11 @@ def build_analysis(request: AnalysisRequest, providers: list[ProviderResult]) ->
         "assessments": [a.model_dump() for a in assessments],
         "occurrences": occurrences,
         "geology_units": units,
+        "layers": layers,
+        "structure": next(
+            (e.raw_value for e in evidence if e.evidence_type == "structure"),
+            {"nearest_km": None, "count": 0, "total_km": 0},
+        ),
         "rating": rated[0].prospectivity if rated else Category.INSUFFICIENT,
         "summary": summary,
         "coverage": [

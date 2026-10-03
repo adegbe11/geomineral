@@ -83,6 +83,11 @@ export type Analysis = {
   assessments: Assessment[];
   occurrences: Occurrence[];
   geology_units?: GeologyUnit[];
+  layers?: {
+    faults?: { type: string; distance_km: number; paths: number[][][] }[];
+    units?: { name: string; lith: string; age: string; color: string; here: boolean; rings: number[][][] }[];
+  };
+  structure?: { nearest_km: number | null; count: number; total_km: number };
   rating?: string;
   summary: string;
   coverage: { name: string; status: string; detail: string }[];
@@ -93,6 +98,7 @@ export type Analysis = {
 export type Run = {
   id: string;
   status: string;
+  progress?: Record<string, string>;
   result?: Analysis;
   error?: string;
 };

@@ -2,6 +2,7 @@ import { BlurView } from "expo-blur";
 import * as LocationService from "expo-location";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Linking,
   Platform,
@@ -12,8 +13,11 @@ import {
   View,
 } from "react-native";
 import {
+  Check,
   ChevronRight,
   FileText,
+  Layers,
+  Minus,
   LocateFixed,
   MapPin,
   PenLine,
@@ -156,7 +160,8 @@ export function Explore({
   const [satellite, setSatellite] = useState(true),
     [drawing, setDrawing] = useState(false),
     [error, setError] = useState(""),
-    [site, setSite] = useState<Occurrence | null>(null);
+    [site, setSite] = useState<Occurrence | null>(null),
+    [showGeology, setShowGeology] = useState(true);
   const a = w.analysis;
   const top = a && best(a);
   const rise = useRef(new Animated.Value(still ? 0 : 260)).current;
@@ -195,6 +200,7 @@ export function Explore({
           drawing={drawing}
           radiusKm={w.hasPlace ? (a?.radius_km ?? w.radius) : undefined}
           sites={a?.occurrences}
+          geology={showGeology ? a?.layers : undefined}
           selectedSite={site?.id}
           onSite={(o) => {
             haptic.select();
@@ -227,6 +233,11 @@ export function Explore({
             />
           </View>
           <View style={{ flex: 1 }} />
+          {!!a?.layers?.units?.length && (
+            <GlassButton label="Geology layer" active={showGeology} onPress={() => setShowGeology(!showGeology)}>
+              <Layers size={19} color={showGeology ? c.onTint : c.label} />
+            </GlassButton>
+          )}
           <GlassButton label="Draw area" active={drawing} onPress={() => setDrawing(!drawing)}>
             <PenLine size={19} color={drawing ? c.onTint : c.label} />
           </GlassButton>
@@ -435,23 +446,78 @@ function Stat({ label, value, suffix }: { label: string; value: number; suffix?:
   );
 }
 
-function Loading() {
+// Each stage is a real evidence source the worker reports as it finishes.
+const STAGES = [
+  ["macrostrat", "Geological map"],
+  ["usgs-mrds", "Mine and mineral records"],
+  ["openalex", "Published research"],
+  ["macrostrat-structure", "Faults and structure"],
+] as const;
+const STAGE_NOTE: Record<string, string> = {
+  empty: "Nothing recorded here",
+  unavailable: "Unavailable right now",
+  disabled: "Switched off",
+};
+
+function StageRow({ label, state, waiting }: { label: string; state?: string; waiting?: boolean }) {
+  const { c, ui } = useTheme();
+  const pop = useRef(new Animated.Value(state ? 1 : 0)).current;
+  useEffect(() => {
+    if (!state) return;
+    haptic.select();
+    Animated.spring(pop, { toValue: 1, speed: 14, bounciness: 12, useNativeDriver: native }).start();
+  }, [state]);
+  const done = state === "available" || state === "empty";
+  return (
+    <View style={[ui.row, { gap: 12, paddingVertical: 8 }]} accessibilityLabel={`${label}: ${state ?? "working"}`}>
+      <View style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }}>
+        {waiting ? (
+          <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: c.fillStrong }} />
+        ) : !state ? (
+          <ActivityIndicator color={c.tint} />
+        ) : (
+          <Animated.View
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: done ? c.tint : c.fillStrong,
+              transform: [{ scale: pop }],
+            }}
+          >
+            {done ? <Check size={14} color={c.onTint} strokeWidth={3.2} /> : <Minus size={14} color={c.secondary} strokeWidth={3} />}
+          </Animated.View>
+        )}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[ui.text, !state && { color: c.secondary }]}>{label}</Text>
+        {!!state && STAGE_NOTE[state] && <Text style={ui.caption}>{STAGE_NOTE[state]}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function Loading({ place, progress }: { place: string; progress: Record<string, string> }) {
   const { ui } = useTheme();
+  const finished = STAGES.filter(([key]) => progress[key]).length;
   return (
     <View style={{ gap: 16 }}>
-      <View style={[ui.card, { gap: 14 }]}>
-        <Shimmer style={{ width: 90, height: 22, borderRadius: 11 }} />
-        <Shimmer style={{ width: "55%", height: 32 }} />
-        <View style={ui.row}>
-          {[0, 1, 2].map((i) => (
-            <Shimmer key={i} style={{ flex: 1, height: 44 }} />
+      <FadeIn>
+        <View style={[ui.card, { gap: 4, padding: 20 }]}>
+          <Text style={ui.caption}>Analyzing</Text>
+          <Text style={ui.h2} numberOfLines={2}>
+            {place}
+          </Text>
+          <View style={[ui.divider, { marginVertical: 10 }]} />
+          {STAGES.map(([key, label]) => (
+            <StageRow key={key} label={label} state={progress[key]} />
           ))}
+          <StageRow label="Prospectivity model" waiting={finished < STAGES.length} />
         </View>
-      </View>
-      {[0, 1].map((i) => (
-        <Shimmer key={i} style={{ height: 96, borderRadius: 22 }} />
-      ))}
-      <Text style={[ui.small, { textAlign: "center" }]}>Checking maps and mine records</Text>
+      </FadeIn>
+      <Shimmer style={{ height: 96, borderRadius: 22 }} />
     </View>
   );
 }
@@ -494,6 +560,7 @@ export function AnalysisScreen({
             interactive={false}
             radiusKm={a?.radius_km ?? w.radius}
             sites={a?.occurrences}
+            geology={a?.layers}
             selectedSite={site}
             onSite={(o) => {
               haptic.select();
@@ -508,7 +575,7 @@ export function AnalysisScreen({
           <Text style={ui.small}>{coordinates(w.location)}</Text>
         </View>
         {!a && !w.error ? (
-          <Loading />
+          <Loading place={w.location.name || "This place"} progress={w.progress} />
         ) : w.error ? (
           <Empty title="Analysis unavailable" description={w.error}>
             <Button title="Try Again" onPress={() => void w.analyze()} />
@@ -526,7 +593,7 @@ export function AnalysisScreen({
                   <View style={ui.row}>
                     <Stat label="Sites" value={a.occurrences.length} />
                     <Stat label="Producers" value={producers} />
-                    <Stat label="Radius" value={a.radius_km} suffix=" km" />
+                    <Stat label="Faults" value={a.structure?.count ?? 0} />
                   </View>
                 </View>
               </FadeIn>
@@ -616,6 +683,14 @@ export function AnalysisScreen({
                   <DeepTime location={a.location} units={a.geology_units} />
                 ) : tab === "Geology" ? (
                   <>
+                    <View style={[ui.card, ui.row, { gap: 12 }]}>
+                      <View style={{ width: 22, height: 3, borderRadius: 2, backgroundColor: "#FF5A4E" }} />
+                      <Text style={[ui.text, { flex: 1 }]}>
+                        {a.structure?.count
+                          ? `Nearest fault ${a.structure.nearest_km?.toFixed(1)} km · ${a.structure.count} mapped`
+                          : `No mapped faults within ${a.radius_km} km`}
+                      </Text>
+                    </View>
                     {!a.geology_units?.length && <Empty title="No mapped geology" description="" />}
                     {a.geology_units?.map((u, i) => (
                       <FadeIn key={i} index={i}>

@@ -67,6 +67,7 @@ class ProviderResult(BaseModel):
     status: Literal["available", "empty", "unavailable", "disabled"]
     evidence: list[Evidence] = Field(default_factory=list)
     occurrences: list[dict] = Field(default_factory=list)
+    layers: dict = Field(default_factory=dict)
     message: str = ""
     retrieved_at: str = Field(default_factory=now)
     dataset_version: str = "Live service; upstream version unspecified"

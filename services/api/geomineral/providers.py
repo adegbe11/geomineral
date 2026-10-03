@@ -13,6 +13,7 @@ from .config import LIVE_PROVIDERS, USER_AGENT
 from .geo import distance_m
 from .literature import OPENALEX, LiteratureProvider
 from .schemas import Evidence, Point, ProviderResult, Source
+from .structure import STRUCTURE, StructureProvider
 
 log = logging.getLogger(__name__)
 MACROSTRAT = Source(
@@ -39,7 +40,7 @@ MRDS = Source(
     resolution="Point locations; positional accuracy varies by record",
     notes="Historical compilation. Records may be incomplete or outdated; a mine record does not establish current activity.",
 )
-SOURCES = [MACROSTRAT, MRDS, OPENALEX]
+SOURCES = [MACROSTRAT, MRDS, OPENALEX, STRUCTURE]
 WFS_URL = "https://mrdata.usgs.gov/services/wfs/mrds"
 MS_NS = "http://mapserver.gis.umn.edu/mapserver"
 GML_NS = "http://www.opengis.net/gml"
@@ -268,11 +269,14 @@ class USGSOccurrenceProvider:
 COUNTRY_PROVIDERS: dict[str, list[GeologyProvider]] = {}
 
 
-async def collect(location: Point, radius_km: float, disabled: set[str]) -> list[ProviderResult]:
+async def collect(
+    location: Point, radius_km: float, disabled: set[str], on_done=None
+) -> list[ProviderResult]:
     providers = [
         MacrostratProvider(),
         USGSOccurrenceProvider(),
         LiteratureProvider(),
+        StructureProvider(),
         *COUNTRY_PROVIDERS.get(location.country_code or "", []),
     ]
     async with httpx.AsyncClient(
@@ -287,15 +291,18 @@ async def collect(location: Point, radius_km: float, disabled: set[str]) -> list
                     message="This provider is disabled. No evidence was retrieved.",
                 )
             try:
-                return await provider.fetch(client, location, radius_km)
+                result = await provider.fetch(client, location, radius_km)
             except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 log.warning(
                     "provider_failed source=%s error=%s", provider.source.id, type(exc).__name__
                 )
-                return ProviderResult(
+                result = ProviderResult(
                     source=provider.source,
                     status="unavailable",
                     message="This dataset is temporarily unavailable. Try again later; no conclusions have been drawn from the missing data.",
                 )
+            if on_done:
+                on_done(provider.source.id, result.status)
+            return result
 
         return await asyncio.gather(*(guarded(provider) for provider in providers))

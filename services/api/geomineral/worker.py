@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 
 from .analysis import build_analysis
 from .config import PRODUCTION
-from .db import AnalysisRun, Base, DatasetState, SessionLocal, engine
+from .db import AnalysisRun, Base, DatasetState, SessionLocal, engine, upgrade_local
 from .providers import collect
 from .schemas import AnalysisRequest
 
@@ -44,8 +44,20 @@ async def process_one() -> bool:
         disabled = {
             s.id for s in db.scalars(select(DatasetState).where(DatasetState.enabled.is_(False)))
         }
+    progress: dict[str, str] = {}
+
+    def report(source_id: str, status: str):
+        progress[source_id] = status
+        with SessionLocal() as db:
+            db.execute(
+                update(AnalysisRun)
+                .where(AnalysisRun.id == run_id)
+                .values(progress=json.dumps(progress))
+            )
+            db.commit()
+
     try:
-        providers = await collect(request.location, request.radius_km, disabled)
+        providers = await collect(request.location, request.radius_km, disabled, report)
         result = build_analysis(request, providers)
         with SessionLocal() as db:
             db.execute(
@@ -71,6 +83,7 @@ async def process_one() -> bool:
 async def main():
     if not PRODUCTION:
         Base.metadata.create_all(engine)
+        upgrade_local(engine)
     while True:
         if not await process_one():
             await asyncio.sleep(1)

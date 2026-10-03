@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Platform, Text, View } from "react-native";
-import MapView, { Circle, Marker, Polygon } from "react-native-maps";
+import MapView, { Circle, Marker, Polygon, Polyline } from "react-native-maps";
 import { siteColor } from "../theme";
 import type { Location, Occurrence } from "../types";
 export type MapProps = {
@@ -16,6 +16,12 @@ export type MapProps = {
   interactive?: boolean;
   /** No place chosen yet: show the whole world without a pin. */
   world?: boolean;
+  /** Mapped rock units and faults drawn over the imagery. */
+  geology?: GeologyLayers;
+};
+export type GeologyLayers = {
+  faults?: { type: string; paths: number[][][] }[];
+  units?: { name: string; color: string; rings: number[][][] }[];
 };
 // Fits the search circle with a little margin.
 export const spanFor = (radiusKm = 25) => (radiusKm / 111) * 2.4;
@@ -31,6 +37,7 @@ export default function NativeMap({
   onSite,
   interactive = true,
   world = false,
+  geology,
 }: MapProps) {
   const ref = useRef<MapView>(null);
   const span = world ? 140 : radiusKm ? spanFor(radiusKm) : 0.15;
@@ -111,6 +118,27 @@ export default function NativeMap({
           />
         </Marker>
       ))}
+      {geology?.units?.slice(0, 80).flatMap((u, i) =>
+        u.rings.slice(0, 4).map((ring, j) => (
+          <Polygon
+            key={`u${i}-${j}`}
+            coordinates={ring.map(([lng, lat]) => ({ latitude: lat, longitude: lng }))}
+            fillColor={`${u.color}66`}
+            strokeColor={`${u.color}AA`}
+            strokeWidth={0.5}
+          />
+        )),
+      )}
+      {geology?.faults?.slice(0, 120).flatMap((f, i) =>
+        f.paths.map((path, j) => (
+          <Polyline
+            key={`f${i}-${j}`}
+            coordinates={path.map(([lng, lat]) => ({ latitude: lat, longitude: lng }))}
+            strokeColor="#FF5A4E"
+            strokeWidth={1.6}
+          />
+        )),
+      )}
       {!world && (
         <Marker
           coordinate={{ latitude: location.lat, longitude: location.lng }}

@@ -26,7 +26,18 @@ from .auth import (
     token_hash,
     verify_password,
 )
-from .db import AnalysisRun, Base, DatasetState, FieldRecord, Project, Session, User, engine, get_db
+from .db import (
+    AnalysisRun,
+    Base,
+    DatasetState,
+    FieldRecord,
+    Project,
+    Session,
+    User,
+    engine,
+    get_db,
+    upgrade_local,
+)
 from .geo import polygon_area_m2
 from .providers import SOURCES
 from .schemas import AnalysisRequest, Credentials, Point, ProjectInput, RecordInput
@@ -42,6 +53,7 @@ log = logging.getLogger(__name__)
 async def lifespan(app):
     if not config.PRODUCTION:
         Base.metadata.create_all(engine)
+        upgrade_local(engine)
     yield
 
 
@@ -358,6 +370,7 @@ def get_analysis(
     return {
         "id": run.id,
         "status": run.status,
+        "progress": json.loads(run.progress) if run.progress else {},
         "result": json.loads(run.result_json) if run.result_json else None,
         "error": run.error,
     }

@@ -56,6 +56,7 @@ function useWorkspaceState() {
     [analysis, setAnalysis] = useState<Analysis | null>(null),
     [runId, setRunId] = useState(""),
     [status, setStatus] = useState(""),
+    [progress, setProgress] = useState<Record<string, string>>({}),
     [error, setError] = useState("");
   const [recent, setRecent] = useState<
     { id: string; location: Location; result: Analysis }[]
@@ -146,6 +147,7 @@ function useWorkspaceState() {
   async function analyze(point: Location = location) {
     const version = ++generation.current;
     setStatus("queued");
+    setProgress({});
     setError("");
     setAnalysis(null);
     try {
@@ -162,6 +164,7 @@ function useWorkspaceState() {
           const next = await api<Run>(`/analyses/${run.id}`);
           if (generation.current !== version) return;
           setStatus(next.status);
+          setProgress(next.progress ?? {});
           if (next.status === "complete" && next.result) {
             setAnalysis(next.result);
             const named =
@@ -264,6 +267,7 @@ function useWorkspaceState() {
     runId,
     setRunId,
     status,
+    progress,
     error,
     analyze,
     recent,

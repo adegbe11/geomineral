@@ -245,9 +245,10 @@ async def test_provider_failure_is_isolated(monkeypatch):
     monkeypatch.setattr(providers.MacrostratProvider, "fetch", fails)
     monkeypatch.setattr(providers.USGSOccurrenceProvider, "fetch", empty)
     monkeypatch.setattr(providers.LiteratureProvider, "fetch", empty)
+    monkeypatch.setattr(providers.StructureProvider, "fetch", empty)
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = await providers.collect(Point(lat=0, lng=0), 25, set())
-    assert [r.status for r in results] == ["unavailable", "empty", "empty"]
+    assert [r.status for r in results] == ["unavailable", "empty", "empty", "empty"]
 
 
 async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):
@@ -416,3 +417,61 @@ async def test_literature_limit_is_reported_not_treated_as_absence(monkeypatch):
         )
     assert result.status == "unavailable"
     assert "allowance" in result.message
+
+
+def test_nearby_fault_strengthens_but_never_creates_a_candidate():
+    from geomineral.analysis import assess
+
+    fault = Evidence(
+        id="structure:fault:1",
+        source_id="macrostrat-structure",
+        feature_id="1",
+        evidence_type="structure",
+        description="Synthetic fault",
+        distance_m=2000,
+        raw_value={"nearest_km": 2.0, "count": 3, "total_km": 12.0},
+    )
+    assert assess([fault]) == []
+    gold_site = Evidence(
+        id="mrds:1:Gold",
+        source_id="usgs-mrds",
+        feature_id="1",
+        evidence_type="regional_occurrence",
+        commodity="Gold",
+        direction="positive",
+        description="Synthetic site",
+        distance_m=12000,
+        raw_value={"dev_stat": "Occurrence"},
+    )
+    alone = assess([gold_site])[0]
+    with_fault = assess([gold_site, fault])[0]
+    assert alone.prospectivity == "Low"
+    assert with_fault.prospectivity == "Moderate"
+    assert "mapped fault 2.0 km away" in with_fault.explanation
+
+
+async def test_structure_reads_fault_distance_from_tiles(monkeypatch):
+    import mapbox_vector_tile
+    from geomineral import structure
+
+    # A fault line just east of the pin at (0, 0), encoded like Macrostrat tiles.
+    tile = mapbox_vector_tile.encode(
+        [
+            {
+                "name": "lines",
+                "features": [
+                    {
+                        "geometry": "LINESTRING(10 0, 10 4096)",
+                        "properties": {"line_id": 7, "type": "fault"},
+                    }
+                ],
+            }
+        ]
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, content=tile))
+    ) as client:
+        result = await structure.StructureProvider().fetch(client, Point(lat=0.0, lng=0.0), 25)
+    assert result.status == "available"
+    assert result.evidence[0].raw_value["count"] == 1
+    assert result.layers["faults"][0]["paths"]
