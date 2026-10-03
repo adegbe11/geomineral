@@ -16,9 +16,9 @@ dist-native/
 
 # Not needed for the app build
 .claude/
-services/
-docs/
-tests/
-scripts/
-infrastructure/
-expo-go-qr.png
+/services/
+/docs/
+/tests/
+/scripts/
+/infrastructure/
+/expo-go-qr.png
