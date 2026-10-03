@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Animated,
   BackHandler,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +19,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Camera, Compass, Folder, Home, UserRound, X } from "lucide-react-native";
 import { Brand, Button, Header } from "./components/Primitives";
 import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
+import OrbitingEarth from "./components/OrbitingEarth";
 import HomeScreen from "./HomeScreen";
 import IdentifyScreen from "./IdentifyScreen";
 import MineralGuide from "./MineralGuide";
@@ -293,10 +293,16 @@ function Shell() {
         </View>
       ) : !w.welcomed ? (
         <View style={{ flex: 1, backgroundColor: "#031310" }}>
-          <Image
-            source={require("../assets/earth.jpg")}
-            style={{ position: "absolute", top: 0, width: "100%", height: "68%" }}
-            resizeMode="cover"
+          <OrbitingEarth
+            style={{
+              position: "absolute",
+              top: -40,
+              left: "50%",
+              marginLeft: -290,
+              width: 580,
+              height: 580,
+              borderRadius: 290,
+            }}
           />
           <LinearGradient
             colors={["transparent", "#041713", "#041713"]}
@@ -316,7 +322,14 @@ function Shell() {
               <Button title="Get Started" onPress={() => void w.welcome()} />
             </FadeIn>
             <FadeIn delay={550}>
-              <Button plain title="Sign In" onPress={() => setAuth(true)} style={{ minHeight: 44 }} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sign In"
+                onPress={() => setAuth(true)}
+                style={{ minHeight: 44, alignItems: "center", justifyContent: "center" }}
+              >
+                <Text style={{ ...type.headline, color: "rgba(255,255,255,0.9)" }}>Sign In</Text>
+              </Pressable>
             </FadeIn>
           </View>
         </View>
