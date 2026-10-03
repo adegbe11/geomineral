@@ -79,6 +79,13 @@ def test_scan_requires_auth_and_configuration(clients, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert a.get("/api/scan/status").json() == {"available": False, "provider": "openai"}
     assert a.post("/api/scan", json={"photos": [photo_fixture()]}).status_code == 401
+    guest = a.post("/api/mobile/guest", json={}).json()["token"]
+    assert (
+        a.post(
+            "/api/scan", json={"photos": [photo_fixture()]}, headers={"X-Guest-Token": guest}
+        ).status_code
+        == 503
+    )
     register(a, "scan@example.test")
     assert a.post("/api/scan", json={"photos": [photo_fixture()]}).status_code == 503
 

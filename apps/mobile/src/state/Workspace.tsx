@@ -13,7 +13,7 @@ import {
   restoreSession,
   setStored,
 } from "../services/api";
-import type { Analysis, Location, Run, Tab, User } from "../types";
+import type { Analysis, Location, Run, ScanResult, Tab, User } from "../types";
 export const initialLocation: Location = {
   lat: 6.98,
   lng: 6.12,
@@ -29,7 +29,10 @@ function useWorkspaceState() {
     [welcomed, setWelcomed] = useState(false),
     [tab, setTab] = useState<Tab>("Home"),
     [professional, setProfessional] = useState(false),
-    [radius, setRadius] = useState(25);
+    [radius, setRadius] = useState(25),
+    [scanPhotos, setScanPhotos] = useState<string[]>([]),
+    [scanResult, setScanResult] = useState<ScanResult | null>(null),
+    [scanReview, setScanReview] = useState(false);
   const [location, setLocation] = useState<Location>(initialLocation),
     [polygon, setPolygon] = useState<number[][]>([]),
     [analysis, setAnalysis] = useState<Analysis | null>(null),
@@ -147,6 +150,9 @@ function useWorkspaceState() {
     if (timer.current) clearTimeout(timer.current);
     setUser(null);
     setRecent([]);
+    setScanPhotos([]);
+    setScanResult(null);
+    setScanReview(false);
     setAnalysis(null);
     setRunId("");
     setStatus("");
@@ -166,6 +172,12 @@ function useWorkspaceState() {
     selectLocation,
     radius,
     setRadius,
+    scanPhotos,
+    setScanPhotos,
+    scanResult,
+    setScanResult,
+    scanReview,
+    setScanReview,
     polygon,
     setPolygon,
     analysis,

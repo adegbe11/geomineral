@@ -18,3 +18,9 @@ export type FieldRecord = SharedRecord & { photos?: string[] };
 export type Project = Omit<SharedProject, "records"> & {
   records?: FieldRecord[];
 };
+export type ScanResult = {
+  candidate: string;
+  candidates?: string[];
+  observations: string;
+  next_check: string;
+};

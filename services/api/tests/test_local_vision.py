@@ -7,10 +7,19 @@ from geomineral import vision
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("geological,expected", [(True, "Tourmaline"), (False, "Unidentified")])
+@pytest.mark.parametrize(
+    "geological,names,expected",
+    [
+        (True, ["tourmaline", "Tourmaline", "schorl"], ["Tourmaline", "Schorl"]),
+        (False, ["blue", "blue"], []),
+        # A small model may flag an obvious specimen as non-geological; known names win.
+        (False, ["pyrite", "copper"], ["Pyrite", "Copper"]),
+        (True, ["rock", "unknown"], []),
+    ],
+)
 @pytest.mark.parametrize("field", ["content", "thinking"])
-async def test_structured_local_candidate_and_non_geological_gate(
-    monkeypatch, geological, expected, field
+async def test_structured_local_candidates_and_non_geological_gate(
+    monkeypatch, geological, names, expected, field
 ):
     monkeypatch.setenv("OLLAMA_VISION_MODEL", "qwen3-vl:2b")
     monkeypatch.setenv("ROCK_VISION_PROVIDER", "ollama")
@@ -30,9 +39,8 @@ async def test_structured_local_candidate_and_non_geological_gate(
                 "message": {
                     field: json.dumps(
                         {
-                            "candidate": "Tourmaline",
+                            "candidates": names,
                             "observations": "Dark elongated crystals.",
-                            "next_check": "Confirm with a geologist.",
                             "is_geological": geological,
                         }
                     )
@@ -44,7 +52,8 @@ async def test_structured_local_candidate_and_non_geological_gate(
     result = await vision.identify(
         vision.ScanInput.model_construct(photos=["data:image/jpeg;base64,test-image"])
     )
-    assert result["candidate"] == expected
+    assert result["candidates"] == expected
+    assert result["candidate"] == (expected[0] if expected else "Unidentified")
     assert "is_geological" not in result
 
 
@@ -168,3 +177,35 @@ async def test_local_failure_has_no_cloud_fallback(monkeypatch):
             vision.ScanInput.model_construct(photos=["data:image/jpeg;base64,test-image"])
         )
     assert error.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_second_scan_waits_for_the_first(monkeypatch):
+    import asyncio
+
+    monkeypatch.setenv("OLLAMA_VISION_MODEL", "qwen3-vl:2b")
+    monkeypatch.setenv("ROCK_VISION_PROVIDER", "ollama")
+    order = []
+
+    async def respond(self, url, **kwargs):
+        order.append("start")
+        await asyncio.sleep(0.05)
+        order.append("end")
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json={
+                "done": True,
+                "message": {
+                    "content": json.dumps(
+                        {"candidates": ["quartz"], "observations": "Clear.", "is_geological": True}
+                    )
+                },
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", respond)
+    body = vision.ScanInput.model_construct(photos=["data:image/jpeg;base64,test-image"])
+    results = await asyncio.gather(vision.identify(body), vision.identify(body))
+    assert [r["candidate"] for r in results] == ["Quartz", "Quartz"]
+    assert order == ["start", "end", "start", "end"]

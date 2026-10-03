@@ -102,7 +102,10 @@ async def scan_status():
 
 
 @app.post("/api/scan")
-async def scan(body: ScanInput, user: User = Depends(require_user)):
+async def scan(body: ScanInput, request: Request, user: User | None = Depends(current_user)):
+    # Guests may scan with the app's guest token; a scan never stores photos.
+    if not user and len(request.headers.get("x-guest-token", "")) < 32:
+        raise HTTPException(401, "Sign in or open the app to scan.")
     return await identify(body)
 
 

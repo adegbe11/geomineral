@@ -42,7 +42,7 @@ import { WorkspaceProvider, useWorkspace } from "./state/Workspace";
 import { api, authenticate, coordinates, post, signOut } from "./services/api";
 import { colors, ui } from "./theme";
 import type { Project } from "./types";
-import { Scanner } from "./screens";
+import { Scanner } from "./ScanScreen";
 import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
 function Shell() {
   const w = useWorkspace();
@@ -274,7 +274,7 @@ function Shell() {
           results={() => setRoute("analysis")}
         />
       ) : w.tab === "Scan" ? (
-        <Scanner signIn={() => setAuth(true)} />
+        <Scanner signIn={() => setAuth(true)} guide={openGuide} />
       ) : w.tab === "Projects" ? (
         <>
           <Header
