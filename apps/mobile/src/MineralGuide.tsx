@@ -16,6 +16,15 @@ import {
 } from "./minerals";
 import { fluorescence, magnetism } from "./identify";
 import { FadeIn, Float, haptic, Pressy } from "./motion";
+import {
+  asMineral,
+  colorFor,
+  findSpecies,
+  habitFor,
+  searchSpecies,
+  SPECIES_COUNT,
+  wikidataUrl,
+} from "./species";
 import { useWorkspace } from "./state/Workspace";
 import { projectsWithCache, saveRecord } from "./services/outbox";
 import { type, useTheme } from "./theme";
@@ -46,7 +55,9 @@ export default function MineralGuide({
 }) {
   const w = useWorkspace();
   const { c, ui } = useTheme();
-  const exact = findMineral(initialQuery);
+  const exactSpecies = findSpecies(initialQuery);
+  const exact =
+    findMineral(initialQuery) ?? (exactSpecies ? asMineral(exactSpecies) : undefined);
   const [query, setQuery] = useState(exact ? "" : initialQuery),
     [group, setGroup] = useState("All"),
     [selected, setSelected] = useState<Mineral | null>(exact ?? null),
@@ -115,6 +126,8 @@ export default function MineralGuide({
       )
     : undefined;
   const results = searchMinerals(query, group);
+  const more =
+    group === "All" ? searchSpecies(query, 25, new Set(minerals.map((m) => m.name.toLowerCase()))) : [];
   return (
     <View style={ui.page}>
       <Header
@@ -134,7 +147,7 @@ export default function MineralGuide({
               <Search size={17} color={c.secondary} />
               <TextInput
                 accessibilityLabel="Search minerals"
-                placeholder={`Search ${minerals.length} minerals and rocks`}
+                placeholder={`Search ${SPECIES_COUNT.toLocaleString()} minerals`}
                 placeholderTextColor={c.tertiary}
                 value={query}
                 onChangeText={setQuery}
@@ -221,7 +234,45 @@ export default function MineralGuide({
                 </FadeIn>
               ))}
             </View>
-            {!results.length && <Empty title="No matches" description="" />}
+            {!!more.length && (
+              <>
+                <Text style={ui.section}>All mineral species</Text>
+                <View style={[ui.card, { padding: 0, gap: 0, overflow: "hidden" }]}>
+                  {more.map((sp, i) => (
+                    <FadeIn key={sp.qid} index={i}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${sp.name} profile`}
+                        onPress={() => choose(asMineral(sp))}
+                        style={({ pressed }) => [
+                          ui.row,
+                          { gap: 12, paddingLeft: 14, backgroundColor: pressed ? c.fill : "transparent" },
+                        ]}
+                      >
+                        <MineralArt color={colorFor(sp.name)} habit={habitFor(sp.system)} size={30} />
+                        <View
+                          style={{
+                            flex: 1,
+                            paddingVertical: 10,
+                            paddingRight: 14,
+                            borderBottomWidth: i === more.length - 1 ? 0 : 0.5,
+                            borderColor: c.separator,
+                          }}
+                        >
+                          <Text style={ui.h3} numberOfLines={1}>
+                            {sp.name}
+                          </Text>
+                          <Text style={ui.small} numberOfLines={1}>
+                            {[sp.formula, sp.system].filter(Boolean).join(" · ")}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    </FadeIn>
+                  ))}
+                </View>
+              </>
+            )}
+            {!results.length && !more.length && <Empty title="No matches" description="" />}
           </>
         ) : (
           <View key={selected.name} style={{ gap: 16 }}>
@@ -236,13 +287,15 @@ export default function MineralGuide({
                   <MineralArt color={selected.color} habit={selected.habit} size={140} />
                 </Float>
                 <Text style={ui.largeTitle}>{selected.name}</Text>
-                <Text style={ui.body}>
-                  {selected.rock ? selected.group : `${pretty(selected.formula)} · ${selected.group}`}
+                <Text style={[ui.body, { textAlign: "center" }]}>
+                  {selected.rock ? selected.group : `${selected.species ? selected.formula : pretty(selected.formula)} · ${selected.group}`}
                 </Text>
-                {!selected.rock && <Text style={ui.small}>Mohs hardness: {selected.hardness}</Text>}
+                {!selected.rock && !selected.species && (
+                  <Text style={ui.small}>Mohs hardness: {selected.hardness}</Text>
+                )}
               </View>
             </FadeIn>
-            {!selected.rock && (
+            {!selected.rock && !selected.species && (
               <FadeIn index={1}>
                 <View style={[ui.card, { gap: 14 }]}>
                   <View style={[ui.row, { alignItems: "flex-start" }]}>
@@ -256,6 +309,8 @@ export default function MineralGuide({
                 </View>
               </FadeIn>
             )}
+            {!!selected.traits && (
+            <>
             <FadeIn index={2} style={{ gap: 6, paddingHorizontal: 4 }}>
               <Text style={ui.h2}>Recognition clues</Text>
               <Text style={[ui.text, { color: c.secondary }]}>{selected.traits}</Text>
@@ -264,6 +319,8 @@ export default function MineralGuide({
               <Text style={ui.h2}>Where it forms</Text>
               <Text style={[ui.text, { color: c.secondary }]}>{selected.setting}</Text>
             </FadeIn>
+            </>
+            )}
             {!!selected.lookalikes?.length && (
               <FadeIn index={4} style={{ gap: 10, paddingHorizontal: 4 }}>
                 <Text style={ui.h2}>Look-alikes</Text>
@@ -308,6 +365,12 @@ export default function MineralGuide({
               </FadeIn>
             )}
             <View style={[ui.card, { padding: 0, gap: 0, overflow: "hidden" }]}>
+              {!!selected.species && (
+                <Row
+                  title="Wikidata"
+                  onPress={() => void Linking.openURL(wikidataUrl(selected.species!.qid))}
+                />
+              )}
               <Row
                 title={sourceName(selected)}
                 last

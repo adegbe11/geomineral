@@ -28,6 +28,8 @@ export type Mineral = {
   lookalikes?: string[];
   aliases?: string[];
   rock?: boolean;
+  /** From the full species list: name, formula and crystal system only. */
+  species?: { system: string; qid: string };
 };
 
 const m = (

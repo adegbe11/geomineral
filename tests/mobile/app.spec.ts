@@ -414,3 +414,19 @@ test("land status warns inside a national park", async ({ page }) => {
   await expect(page.getByText(/Yosemite National Park/)).toBeVisible();
   await page.screenshot({ path: "test-results/land.png" });
 });
+
+test("guide searches every IMA mineral species", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("button", { name: "Mineral Guide", exact: true }).click();
+  await expect(page.getByPlaceholder(/Search 6,\d{3} minerals/)).toBeVisible();
+  await page.getByLabel("Search minerals").fill("arsenol");
+  await expect(page.getByText("All mineral species", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open Arsenolite profile" }).click();
+  await expect(page.getByText("As₂O₃ · Cubic crystal system", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Wikidata" })).toBeVisible();
+  await page.screenshot({ path: "test-results/species.png" });
+  expect(errors).toEqual([]);
+});
