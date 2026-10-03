@@ -314,6 +314,7 @@ function Shell() {
                 error={error}
                 signIn={() => setAuth(true)}
                 create={save}
+                guide={openGuide}
                 open={async (p) => {
                   setError("");
                   try {

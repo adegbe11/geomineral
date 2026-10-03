@@ -340,3 +340,29 @@ def test_project_rename_delete_and_counts_are_owner_only(clients):
     assert a.get("/api/projects").json()[0]["record_count"] == 0
     assert a.delete(f"/api/projects/{project['id']}").status_code == 204
     assert a.get("/api/projects").json() == []
+
+
+def test_records_across_projects_are_private_and_photo_free(clients):
+    a, b, _ = clients
+    register(a, "collector@example.test")
+    register(b, "stranger@example.test")
+    for name in ("North", "South"):
+        project = a.post(
+            "/api/projects", json={"name": name, "location": {"lat": 1, "lng": 2}}
+        ).json()
+        a.post(
+            f"/api/projects/{project['id']}/records",
+            json={
+                "kind": "sample",
+                "title": f"{name} pyrite",
+                "description": "Brassy cubes",
+                "rock_type": "Pyrite",
+                "location": {"lat": 1, "lng": 2},
+                "photos": [photo_fixture()],
+            },
+        )
+    records = a.get("/api/records").json()
+    assert {r["project_name"] for r in records} == {"North", "South"}
+    assert all(r["photo_count"] == 1 and "photos" not in r for r in records)
+    assert b.get("/api/records").json() == []
+    assert a.get("/api/records", headers={"Authorization": ""}).status_code == 200

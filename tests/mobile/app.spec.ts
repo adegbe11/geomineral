@@ -307,3 +307,36 @@ test("identify by tests separates gold from pyrite", async ({ page }) => {
   await expect(page.getByText("Recognition clues", { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("rockdex collects a saved mineral and unlocks a badge", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await page.getByRole("button", { name: "New here? Create Account" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(`rockdex-${Date.now()}@example.test`);
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-native-test-only-passphrase");
+  await page.getByRole("button", { name: "Create Account", exact: true }).click();
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  await page.getByLabel("Project name", { exact: true }).fill("Cabinet test");
+  await page.getByRole("button", { name: "Save Project", exact: true }).click();
+  await page.getByRole("tab", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Mineral Guide", exact: true }).click();
+  await page.getByLabel("Search minerals").fill("pyrite");
+  await page.getByRole("button", { name: "Open Pyrite profile" }).click();
+  await page.getByRole("button", { name: "Add Sample" }).click();
+  await page.getByRole("button", { name: "Save to Cabinet test" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("button", { name: "Go back" }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Rockdex", exact: true }).click();
+  await expect(page.getByLabel("First Find", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Collector, locked")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pyrite, collected" })).toBeVisible();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "test-results/rockdex.png", fullPage: true });
+  expect(errors).toEqual([]);
+});

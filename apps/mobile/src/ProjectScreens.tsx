@@ -16,7 +16,8 @@ import NativeMap from "./components/NativeMap";
 import MineralArt from "./components/MineralArt";
 import { Brand, Button, Empty, Header, Row } from "./components/Primitives";
 import { findMineral } from "./minerals";
-import { FadeIn, haptic, Pressy } from "./motion";
+import { FadeIn, haptic, Pressy, Segmented } from "./motion";
+import Rockdex from "./Rockdex";
 import { api, coordinates } from "./services/api";
 import { useWorkspace } from "./state/Workspace";
 import { type, useTheme } from "./theme";
@@ -49,7 +50,9 @@ export function ProjectsList({
   signIn,
   create,
   open,
+  guide,
 }: {
+  guide: (name: string) => void;
   projects: Project[];
   busy: boolean;
   error: string;
@@ -59,13 +62,14 @@ export function ProjectsList({
 }) {
   const w = useWorkspace();
   const { c, ui } = useTheme();
+  const [view, setView] = useState<"Projects" | "Rockdex">("Projects");
   return (
     <View style={ui.page}>
       <Header
         large
-        title="Projects"
+        title={view}
         right={
-          w.user ? (
+          w.user && view === "Projects" ? (
             <Pressy
               accessibilityRole="button"
               accessibilityLabel="Create project"
@@ -78,6 +82,11 @@ export function ProjectsList({
         }
       />
       <ScrollView contentContainerStyle={ui.content}>
+        <Segmented items={["Projects", "Rockdex"] as const} value={view} onChange={setView} />
+        {view === "Rockdex" ? (
+          <Rockdex open={guide} signIn={signIn} />
+        ) : (
+        <>
         {!!error && <Text style={ui.error}>{error}</Text>}
         {busy && !projects.length && <ActivityIndicator color={c.tint} />}
         {!w.user ? (
@@ -116,6 +125,8 @@ export function ProjectsList({
               </Pressy>
             </FadeIn>
           ))
+        )}
+        </>
         )}
       </ScrollView>
     </View>

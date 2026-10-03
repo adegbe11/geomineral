@@ -446,6 +446,33 @@ def create_project(
     return project_dict(project)
 
 
+@app.get("/api/records")
+def my_records(user: User = Depends(require_user), db: DBSession = Depends(get_db)):
+    """Every record the user owns, newest first, without photo data."""
+    rows = db.execute(
+        select(FieldRecord, Project.name)
+        .join(Project, FieldRecord.project_id == Project.id)
+        .where(Project.owner_id == user.id)
+        .order_by(FieldRecord.created_at.desc())
+    ).all()
+    out = []
+    for record, project_name in rows:
+        payload = json.loads(record.payload)
+        photos = payload.pop("photos", []) or []
+        payload.pop("audio", None)
+        out.append(
+            {
+                "id": record.id,
+                "project_id": record.project_id,
+                "project_name": project_name,
+                "created_at": record.created_at,
+                "photo_count": len(photos),
+                **payload,
+            }
+        )
+    return out
+
+
 @app.get("/api/projects/{project_id}")
 def project_detail(
     project_id: str, user: User = Depends(require_user), db: DBSession = Depends(get_db)
