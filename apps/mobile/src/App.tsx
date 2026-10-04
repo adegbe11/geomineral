@@ -330,7 +330,7 @@ function Shell() {
             </FadeIn>
             <FadeIn delay={300}>
               <Text style={{ ...type.body, color: "rgba(255,255,255,0.7)", textAlign: "center", marginBottom: 18 }}>
-                Identify rocks. Read the ground.
+                Scan any rock. Find minerals near you.
               </Text>
             </FadeIn>
             <FadeIn delay={450}>
