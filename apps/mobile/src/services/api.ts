@@ -1,14 +1,20 @@
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import type { User } from "../types";
 const configured = process.env.EXPO_PUBLIC_API_ORIGIN;
-export const API_ORIGIN =
-  configured ||
-  (__DEV__
-    ? Platform.OS === "android"
-      ? "http://10.0.2.2:8000"
-      : "http://127.0.0.1:8000"
-    : "");
+
+/** In development the API runs beside the dev server, on whatever address the
+ * laptop has today (hotspots hand out a new one on every reconnect). */
+function devOrigin() {
+  const host =
+    Platform.OS === "web"
+      ? globalThis.location?.hostname
+      : Constants.expoConfig?.hostUri?.split(":")[0];
+  if (host) return `http://${host}:8000`;
+  return Platform.OS === "android" ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000";
+}
+export const API_ORIGIN = __DEV__ ? devOrigin() : configured || "";
 /** The server could not be reached (offline, timeout, DNS). */
 export class NetworkError extends Error {}
 let token: string | null = null,

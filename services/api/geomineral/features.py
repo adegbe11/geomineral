@@ -57,13 +57,21 @@ NAMES = (
     + ["mag_pin", "mag_max", "mag_min", "mag_std", "mag_grad_max", "mag_grad_mean"]
     + ["elev", "relief", "slope_mean", "slope_steep"]
 )
+# Added in model v2; kept after the original names so stored v1 vectors stay valid.
+BASE = len(NAMES)
+NAMES += ["grav_pin", "grav_max", "grav_min", "grav_std", "grav_grad_max"]
+NAMES += ["fault_near_km", "fault_count", "fault_len_km"]
 FAMILY = {
     "Geology": [n for n in NAMES if n.startswith(("lith_", "age_", "units"))],
     "Magnetics": [n for n in NAMES if n.startswith("mag_")],
+    "Gravity": [n for n in NAMES if n.startswith("grav_")],
+    "Faults": [n for n in NAMES if n.startswith("fault_")],
     "Terrain": ["elev", "relief", "slope_mean", "slope_steep"],
 }
+FAULT_ZOOM = 7  # one map scale for training and live use
+GRAV_PX_KM = 9.3
 WINDOW_KM = 25
-MAG_PX_KM = 3.7  # native EMAG2 cell
+MAG_PX_KM = 7.4  # bundled EMAG2 grid, 4 arc-minutes
 TERRAIN_PX_KM = 0.6
 
 
@@ -109,6 +117,57 @@ def terrain(elev: np.ndarray, px_km: float) -> dict:
         "slope_mean": float(np.nanmean(slope)),
         "slope_steep": float(np.nanmean(slope > 15)),
     }
+
+
+def gravity(grid: np.ndarray, px_km: float) -> dict:
+    """grid: free-air anomaly in mGal around the point (centre = point)."""
+    g = np.asarray(grid, dtype="float64")
+    gy, gx = np.gradient(g, px_km)
+    return {
+        "grav_pin": float(g[g.shape[0] // 2, g.shape[1] // 2]),
+        "grav_max": float(np.nanmax(g)),
+        "grav_min": float(np.nanmin(g)),
+        "grav_std": float(np.nanstd(g)),
+        "grav_grad_max": float(np.nanmax(np.hypot(gx, gy))),
+    }
+
+
+def faults(found: dict | None) -> dict:
+    """found: structure.parse faults within WINDOW_KM, or None when the map has no line data."""
+    if found is None:
+        return {"fault_near_km": np.nan, "fault_count": np.nan, "fault_len_km": np.nan}
+    near = min((f["distance_km"] for f in found.values()), default=WINDOW_KM + 5)
+    return {
+        "fault_near_km": float(near),
+        "fault_count": float(len(found)),
+        "fault_len_km": float(sum(f["length_km"] for f in found.values())),
+    }
+
+
+class GravityGrid:
+    """A bundled global grid read the same way in training and live use.
+
+    Gravity: free-air anomaly from EIGEN-6C4 (stored in 0.1 mGal). Magnetics: EMAG2v3
+    averaged to 4 arc-minutes (stored in nT, -32768 = no data).
+    """
+
+    def __init__(self, path, scale: float = 10):
+        d = np.load(path)
+        self.g = d["g"]
+        self.scale = scale
+        self.dlat, self.dlon = float(d["dlat"]), float(d["dlon"])
+
+    def window(self, lat: float, lng: float) -> np.ndarray:
+        dlat, dlng = window_deg(lat)
+        r0 = int((90 - (lat + dlat)) / self.dlat)
+        r1 = int((90 - (lat - dlat)) / self.dlat) + 1
+        c0 = int(((lng - dlng) % 360) / self.dlon)
+        n = int(2 * dlng / self.dlon) + 2
+        rows = np.clip(np.arange(r0, r1), 0, self.g.shape[0] - 1)
+        cols = (c0 + np.arange(n)) % self.g.shape[1]
+        a = self.g[np.ix_(rows, cols)].astype("float64")
+        a[self.g[np.ix_(rows, cols)] == -32768] = np.nan
+        return a / self.scale
 
 
 def vector(parts: dict) -> list[float]:

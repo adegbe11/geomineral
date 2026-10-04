@@ -19,7 +19,6 @@ from . import features as F
 from .schemas import Evidence, ProviderResult, Source
 
 MODELS = Path(__file__).parent / "models"
-EMAG2_URL = "https://gis.ngdc.noaa.gov/arcgis/rest/services/EMAG2v3/ImageServer/exportImage"
 GROUND_MODEL = Source(
     id="ground-model",
     provider_name="GeoMineral",
@@ -27,11 +26,23 @@ GROUND_MODEL = Source(
     dataset_name="Learned ground model",
     source_url="https://github.com/adegbe11/geomineral",
     api_url="local",
-    licence="Trained on USGS MRDS (public domain), Macrostrat (CC BY 4.0), EMAG2, Terrarium",
+    licence="Trained on USGS MRDS, Macrostrat (CC BY 4.0), EMAG2, EIGEN-6C4, Terrarium",
     commercial_use_allowed=True,
     resolution="25 km window around the pin",
     notes="Similarity to ground around known deposits, tested on held-out regions. Not proof.",
 )
+
+
+@lru_cache(maxsize=1)
+def gravity_grid():
+    f = MODELS / "gravity_fa.npz"
+    return F.GravityGrid(f) if f.exists() else None
+
+
+@lru_cache(maxsize=1)
+def magnetic_grid():
+    f = MODELS / "magnetics_4min.npz"
+    return F.GravityGrid(f, scale=1) if f.exists() else None
 
 
 @lru_cache(maxsize=1)
@@ -56,19 +67,24 @@ def load() -> dict:
 def score(x: list[float]) -> list[dict]:
     """Per mineral: probability, rank among held-out non-deposit ground, layer contributions."""
     models = load()
-    X = np.array([x], dtype="float64")
+    full = dict(zip(F.NAMES, x))
     out = []
     for mineral, m in models.items():
+        # Each model reads the features it was trained on, by name.
+        names = list(m["names"])
+        X = np.array([[full.get(n, np.nan) for n in names]], dtype="float64")
         p = float(m["model"].predict_proba(X)[0, 1])
         # Share of ordinary ground (held-out negatives) that scores at least this high.
         top = 1.0 - float(np.searchsorted(m["neg"], p, side="left")) / max(len(m["neg"]), 1)
         # Share of real deposits (held out) that score at least this high.
         captured = 1.0 - float(np.searchsorted(m["pos"], p, side="left")) / max(len(m["pos"]), 1)
         layers = {}
-        for family, names in F.FAMILY.items():
+        for family, members in F.FAMILY.items():
+            idx = [names.index(n) for n in members if n in names]
+            if not idx:
+                continue
             ablated = X.copy()
-            for n in names:
-                ablated[0, F.NAMES.index(n)] = np.nan
+            ablated[0, idx] = np.nan
             layers[family] = round(p - float(m["model"].predict_proba(ablated)[0, 1]), 3)
         out.append(
             {
@@ -87,7 +103,6 @@ async def describe(client: httpx.AsyncClient, lat: float, lng: float) -> list[fl
     from PIL import Image
 
     dlat, dlng = F.window_deg(lat)
-    n = max(8, round(2 * F.WINDOW_KM / F.MAG_PX_KM))
 
     async def units():
         r = await client.get(
@@ -95,25 +110,6 @@ async def describe(client: httpx.AsyncClient, lat: float, lng: float) -> list[fl
         )
         r.raise_for_status()
         return r.json().get("success", {}).get("data", [])
-
-    async def mag():
-        r = await client.get(
-            EMAG2_URL,
-            params={
-                "bbox": f"{lng - dlng},{lat - dlat},{lng + dlng},{lat + dlat}",
-                "bboxSR": 4326,
-                "imageSR": 4326,
-                "size": f"{n},{n}",
-                "format": "tiff",
-                "pixelType": "F32",
-                "interpolation": "RSP_NearestNeighbor",
-                "f": "image",
-            },
-        )
-        r.raise_for_status()
-        a = np.array(Image.open(io.BytesIO(r.content)), dtype="float64")
-        a[a < -1e30] = np.nan
-        return a
 
     async def elev():
         z = 8
@@ -146,8 +142,32 @@ async def describe(client: httpx.AsyncClient, lat: float, lng: float) -> list[fl
         ]
         return e, 156543.03 * math.cos(math.radians(lat)) / k / 1000
 
-    u, m, (e, px) = await asyncio.gather(units(), mag(), elev())
-    return F.vector({**F.geology(u), **F.magnetics(m, F.MAG_PX_KM), **F.terrain(e, px)})
+    async def faults():
+        from . import structure
+        from .schemas import Point
+
+        z = F.FAULT_ZOOM
+        tiles = await structure.fetch_tiles(client, lat, lng, F.WINDOW_KM, z)
+        if not any("lines" in t for _, _, t in tiles):
+            return None
+        found, _ = structure.parse(tiles, z, Point(lat=lat, lng=lng), F.WINDOW_KM)
+        return found
+
+    u, (e, px), fl = await asyncio.gather(units(), elev(), faults())
+    # Magnetics from the bundled grid, exactly as in training.
+    mg = magnetic_grid()
+    m = mg.window(lat, lng) if mg else np.full((8, 8), np.nan)
+    grid = gravity_grid()
+    g = F.gravity(grid.window(lat, lng), F.GRAV_PX_KM) if grid else {}
+    return F.vector(
+        {
+            **F.geology(u),
+            **F.magnetics(m, F.MAG_PX_KM),
+            **F.terrain(e, px),
+            **g,
+            **F.faults(fl),
+        }
+    )
 
 
 class GroundModelProvider:

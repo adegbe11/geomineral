@@ -60,6 +60,16 @@ MRDS_TO = {
     "Tantalum": "Tantalum",
 }
 PER_MINERAL = 600
+# Common metals with varied deposit styles get more examples.
+BIG = {
+    "Gold": 1500,
+    "Copper": 1500,
+    "Silver": 1200,
+    "Lead": 1200,
+    "Zinc": 1200,
+    "Iron": 1500,
+    "Uranium": 1000,
+}
 RANDOM_LAND = 6000
 BLOCK_DEG = 2.0  # spatial test blocks (~200 km)
 SHIP_AUC = 0.75
@@ -144,7 +154,7 @@ def stage_points():
                 continue
             seen.add(cell)
             picked.append(r)
-            if len(picked) >= PER_MINERAL:
+            if len(picked) >= BIG.get(c, PER_MINERAL):
                 break
         for r in picked:
             chosen[r[0]] = r
@@ -264,7 +274,9 @@ async def stage_features():
             **F.magnetics(mag_grid(lat, lng), F.MAG_PX_KM),
             **F.terrain(e, px),
         }
-        out.write(json.dumps({"id": p["id"], "x": F.vector(parts)}) + "\n")
+        out.write(
+            json.dumps({"id": p["id"], "at": [p["lat"], p["lng"]], "x": F.vector(parts)}) + "\n"
+        )
 
     async with httpx.AsyncClient(timeout=40, headers=UA) as client:
         for i in range(0, len(todo), 200):
@@ -275,6 +287,75 @@ async def stage_features():
             print(f"described {min(i + 200, len(todo))}/{len(todo)}", flush=True)
 
 
+async def stage_extra(shard: int = 0, shards: int = 1):
+    """Gravity (EIGEN-6C4 grid) and mapped faults for every point; run shards in parallel."""
+    from geomineral import structure
+    from geomineral.schemas import Point
+
+    grav = F.GravityGrid(ROOT / "gravity_fa.npz")
+    pts = list(csv.DictReader(open(ROOT / "points.csv")))
+    out_file = ROOT / f"features_extra_{shard}.jsonl"
+    done = {json.loads(line)["id"] for f in ROOT.glob("features_extra*.jsonl") for line in open(f)}
+    todo = [p for p in pts if p["id"] not in done]
+    # Neighbouring points share map tiles: sort by tile, give each shard a contiguous slice.
+    todo.sort(key=lambda p: structure.tiles_for(float(p["lat"]), float(p["lng"]), 1, 7)[0])
+    size = math.ceil(len(todo) / shards)
+    todo = todo[shard * size : (shard + 1) * size]
+    print("to describe", len(todo), flush=True)
+    z = F.FAULT_ZOOM
+    cache: dict = {}
+    sem = asyncio.Semaphore(4)  # x8 shards stays polite to the tile server
+    out = open(out_file, "a")
+
+    async def tile(client, x, y):
+        if (x, y) not in cache:
+            for attempt in range(3):
+                try:
+                    r = await client.get(structure.TILES.format(z=z, x=x, y=y))
+                    r.raise_for_status()
+                    t = structure.mapbox_vector_tile.decode(r.content)
+                    cache[(x, y)] = {"lines": t["lines"]} if "lines" in t else {}
+                    break
+                except Exception:  # noqa: BLE001
+                    await asyncio.sleep(2 + 3 * attempt)
+            else:
+                raise RuntimeError("tile failed")
+        return x, y, cache[(x, y)]
+
+    async def one(client, p):
+        lat, lng = float(p["lat"]), float(p["lng"])
+        async with sem:
+            try:
+                tiles = [
+                    await tile(client, x, y)
+                    for x, y in structure.tiles_for(lat, lng, F.WINDOW_KM, z)
+                ]
+            except RuntimeError:
+                return
+        found = None
+        if any(t for _, _, t in tiles):
+            found, _ = structure.parse(tiles, z, Point(lat=lat, lng=lng), F.WINDOW_KM)
+        parts = {**F.gravity(grav.window(lat, lng), F.GRAV_PX_KM), **F.faults(found)}
+        out.write(
+            json.dumps(
+                {
+                    "id": p["id"],
+                    "at": [p["lat"], p["lng"]],
+                    "x": [parts[n] for n in F.NAMES[F.BASE :]],
+                }
+            )
+            + chr(10)
+        )
+
+    async with httpx.AsyncClient(timeout=40, headers=UA) as client:
+        for i in range(0, len(todo), 300):
+            await asyncio.gather(*(one(client, p) for p in todo[i : i + 300]))
+            out.flush()
+            if len(cache) > 6000:
+                cache.clear()
+            print(f"described {min(i + 300, len(todo))}/{len(todo)}", flush=True)
+
+
 def stage_train():
     import joblib
     from sklearn.ensemble import HistGradientBoostingClassifier
@@ -282,15 +363,35 @@ def stage_train():
     from sklearn.model_selection import GroupKFold
 
     pts = {p["id"]: p for p in csv.DictReader(open(ROOT / "points.csv"))}
-    feats = {}
+    base, extra, located = {}, {}, {}
     for line in open(ROOT / "features.jsonl"):
         d = json.loads(line)
-        feats[d["id"]] = d["x"]
+        base[d["id"]] = d["x"][: F.BASE]
+        located[d["id"]] = d.get("at")
+    for f in ROOT.glob("features_extra*.jsonl"):
+        for line in open(f):
+            d = json.loads(line)
+            extra[d["id"]] = d["x"]
+            if d.get("at") and located.get(d["id"]) not in (None, d["at"]):
+                located[d["id"]] = ["mismatch"]
+    # A row only counts if it was measured at the point's current location.
+    where = {i: [p["lat"], p["lng"]] for i, p in pts.items()}
+    stale = {i for i, at in located.items() if at is not None and at != where.get(i)}
+    feats = {i: base[i] + extra[i] for i in base if i in extra and i not in stale}
+    # Magnetics come from the bundled 4-minute grid, the same one live analysis reads.
+    mg = F.GravityGrid(MODELS / "magnetics_4min.npz", scale=1)
+    mag_cols = [F.NAMES.index(n) for n in F.FAMILY["Magnetics"]]
+    for i, x in feats.items():
+        m = F.magnetics(mg.window(float(pts[i]["lat"]), float(pts[i]["lng"])), F.MAG_PX_KM)
+        for k, n in zip(mag_cols, F.FAMILY["Magnetics"]):
+            x[k] = m[n]
+    print("stale rows skipped:", len(stale), flush=True)
     ids = [i for i in pts if i in feats]
     X = np.array([feats[i] for i in ids], dtype="float64")
     lat = np.array([float(pts[i]["lat"]) for i in ids])
     lng = np.array([float(pts[i]["lng"]) for i in ids])
     abroad = np.array([pts[i]["abroad"] == "1" for i in ids])
+    random_land = np.array([i.startswith("r") for i in ids])
     groups = (np.floor(lat / BLOCK_DEG) * 1000 + np.floor(lng / BLOCK_DEG)).astype(int)
     deposits = json.load(open(ROOT / "deposits.json"))
     minerals = sorted({c for d in deposits for c in d[2]})
@@ -319,48 +420,61 @@ def stage_train():
         use = pos | neg
         y = pos[use].astype(int)
         Xc, gc, ab = X[use], groups[use], abroad[use]
-        oof = np.full(len(y), np.nan)
-        for tr, te in GroupKFold(n_splits=5).split(Xc, y, gc):
-            m = HistGradientBoostingClassifier(
+        land = random_land[use]
+
+        def fresh():
+            return HistGradientBoostingClassifier(
                 max_iter=300,
                 learning_rate=0.06,
                 max_leaf_nodes=24,
                 l2_regularization=1.0,
                 class_weight="balanced",
             )
-            m.fit(Xc[tr], y[tr])
-            oof[te] = m.predict_proba(Xc[te])[:, 1]
-        auc = roc_auc_score(y, oof)
-        auc_abroad = (
-            roc_auc_score(y[ab], oof[ab]) if y[ab].sum() > 20 and (1 - y[ab]).sum() > 20 else None
-        )
-        # Calibrate: what share of held-out positives score above each threshold.
-        ship = auc >= SHIP_AUC and (auc_abroad is None or auc_abroad >= SHIP_AUC - 0.05)
+
+        # Full feature set first; the original rock/magnetics/terrain set as a fallback.
+        for version, cols in (("v2", list(range(len(F.NAMES)))), ("v1", list(range(F.BASE)))):
+            Xv = Xc[:, cols]
+            oof = np.full(len(y), np.nan)
+            for tr, te in GroupKFold(n_splits=5).split(Xv, y, gc):
+                m = fresh()
+                m.fit(Xv[tr], y[tr])
+                oof[te] = m.predict_proba(Xv[te])[:, 1]
+            auc = roc_auc_score(y, oof)
+            auc_abroad = (
+                roc_auc_score(y[ab], oof[ab])
+                if y[ab].sum() > 20 and (1 - y[ab]).sum() > 20
+                else None
+            )
+            ship = auc >= SHIP_AUC and (auc_abroad is None or auc_abroad >= SHIP_AUC - 0.05)
+            if ship:
+                break
         report[c] = {
             "auc": round(auc, 3),
             "auc_outside_us": auc_abroad and round(auc_abroad, 3),
             "positives": int(y.sum()),
             "negatives": int((1 - y).sum()),
             "shipped": bool(ship),
+            "version": version,
         }
         print(c, report[c], flush=True)
+        f = MODELS / f"{c.replace(' ', '_').lower()}.joblib"
         if ship:
-            m = HistGradientBoostingClassifier(
-                max_iter=300,
-                learning_rate=0.06,
-                max_leaf_nodes=24,
-                l2_regularization=1.0,
-                class_weight="balanced",
-            )
-            m.fit(Xc, y)
-            # Percentile table from held-out scores: a pin's score becomes "top x% of ground".
-            neg_scores = np.sort(oof[y == 0])
-            pos_scores = np.sort(oof[y == 1])
+            m = fresh()
+            m.fit(Xv, y)
+            # "Top x% of land": rank against held-out random land only, never against other
+            # deposits (unusual ground that would make ordinary land look too good).
             joblib.dump(
-                {"model": m, "neg": neg_scores, "pos": pos_scores, "names": F.NAMES},
-                MODELS / f"{c.replace(' ', '_').lower()}.joblib",
+                {
+                    "model": m,
+                    "neg": np.sort(oof[(y == 0) & land]),
+                    "pos": np.sort(oof[y == 1]),
+                    "names": [F.NAMES[k] for k in cols],
+                },
+                f,
                 compress=3,
             )
+        elif f.exists():
+            f.unlink()
     json.dump(
         {"features": F.NAMES, "block_deg": BLOCK_DEG, "ship_auc": SHIP_AUC, "minerals": report},
         open(MODELS / "report.json", "w"),
@@ -374,5 +488,7 @@ if __name__ == "__main__":
         stage_points()
     elif stage == "features":
         asyncio.run(stage_features())
+    elif stage == "extra":
+        asyncio.run(stage_extra(*map(int, sys.argv[2:4])) if len(sys.argv) > 3 else stage_extra())
     elif stage == "train":
         stage_train()

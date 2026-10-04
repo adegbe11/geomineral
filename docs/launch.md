@@ -10,7 +10,7 @@ npx eas-cli login
 npx eas-cli build --platform android --profile preview
 ```
 
-Install the APK from the link EAS returns. The `preview` profile points at `http://10.88.26.236:8000`; update `eas.json` if the laptop's address changes.
+Install the APK from the link EAS returns. The `preview` profile points at the laptop's address (currently `http://10.238.109.236:8000`); update `eas.json` if the laptop's address changes.
 
 ## Server
 
