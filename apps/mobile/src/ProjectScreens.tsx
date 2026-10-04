@@ -15,6 +15,7 @@ import { Camera, ChevronRight, CloudUpload, FolderOpen, Pencil, Plus, Trash2, Us
 import NativeMap from "./components/NativeMap";
 import { VoicePlayer } from "./components/VoiceNote";
 import MineralArt from "./components/MineralArt";
+import SwipeRow from "./components/SwipeRow";
 import { Brand, Button, Empty, Header, Row } from "./components/Primitives";
 import { findMineral } from "./minerals";
 import { FadeIn, haptic, Pressy, Segmented } from "./motion";
@@ -52,8 +53,10 @@ export function ProjectsList({
   create,
   open,
   guide,
+  remove,
 }: {
   guide: (name: string) => void;
+  remove: (p: Project) => void;
   projects: Project[];
   busy: boolean;
   error: string;
@@ -117,11 +120,13 @@ export function ProjectsList({
         ) : (
           projects.map((p, i) => (
             <FadeIn key={p.id} index={i}>
+              <SwipeRow label={p.name} onDelete={() => remove(p)}>
+              {(guard) => (
               <Pressy
                 accessibilityRole="button"
                 accessibilityLabel={p.name}
                 scaleTo={0.97}
-                onPress={() => open(p)}
+                onPress={guard(() => open(p))}
                 style={[ui.card, ui.row, { gap: 14 }]}
               >
                 <View style={[s.art, { backgroundColor: c.tintSoft }]}>
@@ -140,6 +145,8 @@ export function ProjectsList({
                 </View>
                 <ChevronRight size={18} color={c.tertiary} />
               </Pressy>
+              )}
+              </SwipeRow>
             </FadeIn>
           ))
         )}
@@ -275,6 +282,7 @@ export function ProjectDetail({
           const known = r.rock_type ? findMineral(r.rock_type) : undefined;
           return (
             <FadeIn key={r.id} index={i}>
+              <SwipeRow label={r.title} onDelete={() => void removeRecord(r.id)}>
               <View style={[ui.card, { gap: 10 }]}>
                 {!!r.photos?.length && (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -319,6 +327,7 @@ export function ProjectDetail({
                   </Text>
                 </Pressable>
               </View>
+              </SwipeRow>
             </FadeIn>
           );
         })}

@@ -397,6 +397,16 @@ function Shell() {
                 signIn={() => setAuth(true)}
                 create={save}
                 guide={openGuide}
+                remove={async (p) => {
+                  setError("");
+                  try {
+                    await api(`/projects/${p.id}`, { method: "DELETE" });
+                    setProjects((old) => old.filter((x) => x.id !== p.id));
+                    haptic.success();
+                  } catch (e) {
+                    setError((e as Error).message);
+                  }
+                }}
                 open={async (p) => {
                   setError("");
                   try {

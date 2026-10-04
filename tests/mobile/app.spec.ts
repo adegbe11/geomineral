@@ -509,3 +509,36 @@ test("a lab-confirmed sample feeds the next analysis", async ({ page }) => {
   await expect(page.getByText("Lab-confirmed", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Lab-confirmed in your sample at the pin/)).toBeVisible();
 });
+
+test("swipe left on a project reveals Delete and removes it", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get Started" }).click();
+  await page.getByRole("tab", { name: "Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Sign In / Create Account" }).click();
+  await page.getByRole("button", { name: "New here? Create Account" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(`swipe-${Date.now()}@example.test`);
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-native-test-only-passphrase");
+  await page.getByRole("button", { name: "Create Account", exact: true }).click();
+  await page.getByRole("tab", { name: "Projects", exact: true }).click();
+  await page.getByRole("button", { name: "Create Project", exact: true }).click();
+  await page.getByLabel("Project name", { exact: true }).fill("Swipe QA");
+  { const mine = page.getByRole("button", { name: "Use My Location" }); if (await mine.isVisible()) await mine.click(); }
+  await page.getByRole("button", { name: "Save Project", exact: true }).click();
+  const row = page.getByRole("button", { name: "Swipe QA", exact: true });
+  await expect(row).toBeVisible();
+  await page.waitForTimeout(800); // let the row finish fading in, as a person would
+  const box = (await row.boundingBox())!;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width - 20, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(box.x + box.width - 20 - i * 18, y);
+    await page.waitForTimeout(16);
+  }
+  await page.mouse.up();
+  // The row has slid aside, uncovering Delete.
+  await expect.poll(async () => (await row.boundingBox())!.x).toBeLessThan(box.x - 60);
+  await page.getByTestId("swipe-delete-Swipe QA").click();
+  await expect(page.getByRole("button", { name: "Swipe QA", exact: true })).toHaveCount(0);
+  await expect(page.getByText("No projects yet", { exact: true })).toBeVisible();
+});

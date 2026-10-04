@@ -1,6 +1,11 @@
 import { BlurView } from "expo-blur";
+import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, StyleSheet, View } from "react-native";
+
+// Apple's own material on iOS 26+, so the iOS 27 glass slider and Reduce
+// Transparency apply to our glass exactly as they do to system glass.
+const native = isLiquidGlassAvailable();
 
 /** Follows the system Reduce Transparency setting (iOS); other platforms report false. */
 export function useReduceTransparency() {
@@ -19,7 +24,7 @@ export function useReduceTransparency() {
   return reduce;
 }
 
-/** Glass backdrop: live blur, or an opaque fill when the user asks for less transparency. */
+/** Glass backdrop: native Liquid Glass, a blur fallback, or an opaque fill on request. */
 export default function GlassFill({
   intensity,
   dark,
@@ -31,6 +36,14 @@ export default function GlassFill({
   solid: string;
 }) {
   const reduce = useReduceTransparency();
+  if (native)
+    return (
+      <GlassView
+        glassEffectStyle="regular"
+        colorScheme={dark ? "dark" : "light"}
+        style={StyleSheet.absoluteFill}
+      />
+    );
   if (reduce) return <View style={[StyleSheet.absoluteFill, { backgroundColor: solid }]} />;
   return <BlurView intensity={intensity} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />;
 }
