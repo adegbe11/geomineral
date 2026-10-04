@@ -302,9 +302,14 @@ class LiteratureProvider:
             )
             for w, term, studied in rows:
                 commodity = TERMS[term]
-                if (commodity, w["id"]) in seen or per_mineral.get(commodity, 0) >= 3:
+                title_key = re.sub(r"\W+", " ", (w.get("display_name") or "").lower()).strip()
+                if (
+                    (commodity, w["id"]) in seen
+                    or (commodity, title_key) in seen
+                    or per_mineral.get(commodity, 0) >= 3
+                ):
                     continue
-                seen.add((commodity, w["id"]))
+                seen.update({(commodity, w["id"]), (commodity, title_key)})
                 per_mineral[commodity] = per_mineral.get(commodity, 0) + 1
                 title = (w.get("display_name") or "Untitled").strip()
                 year = w.get("publication_year")

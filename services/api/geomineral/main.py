@@ -1,4 +1,5 @@
 import asyncio
+import difflib
 import json
 import logging
 import os
@@ -244,6 +245,8 @@ async def search(q: str):
                     ).model_dump()
                     for row in result.json()
                 ]
+                if not places:
+                    places = await fuzzy_places(client, q)
                 if len(geocoder_cache) >= 500:
                     geocoder_cache.clear()
                 geocoder_cache[q] = (time.monotonic(), places)
@@ -253,6 +256,37 @@ async def search(q: str):
                 503,
                 "Place search is temporarily unavailable. Enter latitude, longitude or drop a pin on the map.",
             )
+
+
+async def fuzzy_places(client: httpx.AsyncClient, q: str) -> list[dict]:
+    """Typo-tolerant fallback (Photon, OpenStreetMap data) for village spellings."""
+    r = await client.get("https://photon.komoot.io/api/", params={"q": q, "limit": 6})
+    r.raise_for_status()
+    places = []
+    for f in r.json().get("features", []):
+        p = f.get("properties", {})
+        # Places only: no restaurants or shops that happen to share letters.
+        if p.get("osm_key") not in ("place", "boundary", "natural"):
+            continue
+        lng, lat = f["geometry"]["coordinates"][:2]
+        name = p.get("name") or q
+        close = difflib.SequenceMatcher(None, name.lower(), q.lower()).ratio()
+        if close < 0.75:
+            continue
+        # Keep the searched spelling when the map spells it slightly differently; local
+        # research usually follows the local spelling.
+        if close < 1 and len(q.split()) == 1:
+            name = q.strip().title()
+        parts = [name, p.get("county"), p.get("state"), p.get("country")]
+        places.append(
+            Point(
+                lat=float(lat),
+                lng=float(lng),
+                name=", ".join(dict.fromkeys(x for x in parts if x)),
+                country_code=(p.get("countrycode") or "").upper() or None,
+            ).model_dump()
+        )
+    return list({p["name"]: p for p in places}.values())
 
 
 @app.get("/api/land")

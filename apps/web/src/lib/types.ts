@@ -57,6 +57,37 @@ export type Assessment = {
   host_rocks?: string[];
   papers?: { title: string; year: number | null; url: string; studied: boolean }[];
   samples?: { title: string; rock_type: string; confirmed: boolean; distance_km: number; project: string }[];
+  breakdown?: { layer: string; strength: number | null; note: string }[];
+};
+export type Magnetics = {
+  level: "strong" | "contacts" | "quiet";
+  pin_nt: number;
+  high_nt: number;
+  high_km: number;
+  high_dir: string;
+  contrast_nt: number;
+  grad_max: number;
+};
+export type Terrain = {
+  pin_m: number;
+  min_m: number;
+  max_m: number;
+  relief_m: number;
+  mean_slope: number;
+  steep_pct: number;
+  valley_pct: number;
+};
+export type Satellite = {
+  readable: boolean;
+  bare_pct: number;
+  clear_pct: number;
+  iron_km2: number;
+  clay_km2: number;
+  iron_notable: boolean;
+  clay_notable: boolean;
+  date: string;
+  cloud: number;
+  tiles?: number;
 };
 export type GeologyUnit = {
   name: string;
@@ -89,6 +120,9 @@ export type Analysis = {
     units?: { name: string; lith: string; age: string; color: string; here: boolean; rings: number[][][] }[];
   };
   structure?: { nearest_km: number | null; count: number; total_km: number };
+  magnetics?: Magnetics | null;
+  terrain?: Terrain | null;
+  satellite?: Satellite | null;
   zones?: {
     cell_km: number | null;
     by_commodity: Record<string, { max: number; cells: [number, number, number][]; targets: Target[] }>;

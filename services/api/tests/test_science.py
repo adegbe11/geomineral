@@ -247,12 +247,18 @@ async def test_provider_failure_is_isolated(monkeypatch):
 
     monkeypatch.setattr(providers.MacrostratProvider, "fetch", fails)
     monkeypatch.setattr(providers.USGSOccurrenceProvider, "fetch", empty)
-    monkeypatch.setattr(providers.WikidataMinesProvider, "fetch", empty)
-    monkeypatch.setattr(providers.LiteratureProvider, "fetch", empty)
-    monkeypatch.setattr(providers.StructureProvider, "fetch", empty)
+    for cls in (
+        providers.WikidataMinesProvider,
+        providers.LiteratureProvider,
+        providers.StructureProvider,
+        providers.MagneticsProvider,
+        providers.TerrainProvider,
+        providers.SatelliteProvider,
+    ):
+        monkeypatch.setattr(cls, "fetch", empty)
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = await providers.collect(Point(lat=0, lng=0), 25, set())
-    assert [r.status for r in results] == ["unavailable", "empty", "empty", "empty", "empty"]
+    assert [r.status for r in results] == ["unavailable"] + ["empty"] * 7
 
 
 async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):
@@ -602,3 +608,134 @@ def test_no_zones_without_positioned_evidence():
     )
     assert result["assessments"][0]["commodity"] == "Clay"
     assert result["zones"]["by_commodity"] == {}
+
+
+def _layer(kind: str, raw: dict) -> Evidence:
+    return Evidence(
+        id=f"{kind}:1",
+        source_id="fixture",
+        feature_id="1",
+        evidence_type=kind,
+        description="Synthetic layer",
+        raw_value=raw,
+    )
+
+
+def _gold_site(commodity: str) -> Evidence:
+    return Evidence(
+        id=f"mrds:9:{commodity}",
+        source_id="usgs-mrds",
+        feature_id="9",
+        evidence_type="regional_occurrence",
+        commodity=commodity,
+        direction="positive",
+        description="Synthetic site",
+        distance_m=8000,
+    )
+
+
+MAG = {
+    "level": "quiet",
+    "pin_nt": 0,
+    "high_nt": 20,
+    "high_km": 3,
+    "high_dir": "north",
+    "contrast_nt": 30,
+    "grad_max": 2,
+}
+SAT = {
+    "readable": True,
+    "bare_pct": 40,
+    "iron_km2": 5,
+    "clay_km2": 0,
+    "iron_share": 0.08,
+    "clay_share": 0.01,
+    "iron_notable": True,
+    "clay_notable": False,
+}
+
+
+def test_magnetic_grid_levels():
+    import numpy as np
+    from geomineral.geophysics import describe
+
+    flat = describe(np.zeros((32, 32)), 25)
+    assert flat["level"] == "quiet" and flat["grad_max"] == 0
+    spike = np.zeros((32, 32))
+    spike[10, 20] = 900
+    hot = describe(spike, 25)
+    assert hot["level"] == "strong" and hot["high_nt"] == 900
+    assert hot["high_dir"] in ("north-east", "north")
+
+
+def test_strong_magnetic_high_alone_suggests_iron_only():
+    found = {
+        a.commodity: a
+        for a in assess([_layer("magnetics", {**MAG, "high_nt": 900, "level": "strong"})])
+    }
+    assert set(found) == {"Iron"}
+    assert found["Iron"].prospectivity == "Low"
+    assert "magnetic high of 900 nT" in found["Iron"].explanation
+    mags = [b for b in found["Iron"].breakdown if b["layer"] == "Magnetics"]
+    assert mags[0]["strength"] == 90
+
+
+def test_magnetics_and_alteration_strengthen_but_never_create():
+    assert assess([_layer("magnetics", {**MAG, "level": "contacts", "grad_max": 12})]) == []
+    assert assess([_layer("alteration", SAT)]) == []
+    alone = assess([_gold_site("Gold")])[0]
+    both = assess(
+        [
+            _gold_site("Gold"),
+            _layer("magnetics", {**MAG, "level": "contacts", "grad_max": 12}),
+            _layer("alteration", SAT),
+        ]
+    )[0]
+    assert alone.score == 1 and both.score == 3
+    assert "Magnetic contacts here (up to 12 nT/km)" in both.explanation
+    assert "Satellite: iron-oxide staining over 5 km² of bare ground." in both.explanation
+
+
+def test_breakdown_tells_no_data_from_nothing_found():
+    gold = assess([_gold_site("Gold")], checked={"usgs-mrds", "openalex"})[0]
+    rows = {b["layer"]: b for b in gold.breakdown}
+    assert rows["Known sites"]["strength"] > 0
+    assert rows["Research"]["strength"] == 0
+    assert rows["Geology"]["strength"] is None
+    assert rows["Magnetics"]["strength"] is None
+    assert rows["Satellite"]["strength"] is None
+
+
+def test_satellite_ratios_flag_altered_bare_ground():
+    import numpy as np
+    from geomineral import satellite
+
+    n = satellite.SIZE
+    rng = np.random.default_rng(1)
+    b = {
+        "blue": np.full((n, n), 1000.0),
+        "red": 1700 + rng.normal(0, 40, (n, n)),
+        "nir": np.full((n, n), 2000.0),
+        "swir16": np.full((n, n), 2400.0),
+        "swir22": np.full((n, n), 2000.0),
+        "scl": np.full((n, n), 5.0),
+    }
+    b["red"][140:160, 140:160] = 3000  # an iron-stained patch at the pin
+    out = satellite.analyse(b, 7.0, 6.0, 25)
+    assert out["readable"] and out["bare_pct"] > 90
+    assert out["iron_km2"] > 1
+    assert any(c["kind"] == "iron" and c["frac"] > 0.5 for c in out["cells"])
+    green = dict(b, nir=np.full((n, n), 6000.0))
+    assert satellite.analyse(green, 7.0, 6.0, 25)["readable"] is False
+
+
+def test_terrain_finds_valley_floors():
+    import numpy as np
+    from geomineral.terrain import describe
+
+    x = np.linspace(-1, 1, 100)
+    valley = np.abs(np.add.outer(np.zeros(100), x)) * 400 + 100  # V-shaped valley
+    valley[:, 45:55] = 100  # flat floor
+    stats = describe(valley, np.ones_like(valley, dtype=bool), 100.0, 100.0)
+    assert stats["relief_m"] == 400
+    assert stats["valley_pct"] >= 5

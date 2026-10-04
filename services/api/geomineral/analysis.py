@@ -6,7 +6,7 @@ import re
 
 from .schemas import AnalysisRequest, Assessment, Category, Evidence, ProviderResult, now
 
-MODEL_VERSION = "screening-0.2.0"
+MODEL_VERSION = "screening-0.3.0"
 MISSING = [
     "No verified local assay results",
     "No drilling evidence",
@@ -90,6 +90,36 @@ STRUCTURAL = {
     "Fluorite",
     "Barite",
 }
+# Magnetite-bearing or magnetically mapped deposit styles.
+MAGNETIC = {
+    "Iron",
+    "Nickel",
+    "Chromium",
+    "Cobalt",
+    "Platinum",
+    "Titanium",
+    "Vanadium",
+    "Copper",
+    "Gold",
+}
+# Satellite alteration kinds and the minerals each commonly accompanies.
+ALTERATION = {
+    "iron": {"Iron", "Gold", "Copper", "Manganese", "Silver", "Zinc", "Lead"},
+    "clay": {"Clay", "Kaolin", "Gold", "Copper", "Lithium"},
+}
+ALTERATION_NAME = {"iron": "iron-oxide staining", "clay": "clay alteration"}
+# Heavy, durable minerals that collect on valley floors.
+PLACER = {"Gold", "Tin", "Diamond", "Platinum", "Titanium", "Zirconium", "Gemstones"}
+STRONG_MAG_NT = 300
+# Source ids behind each evidence family, for "no data" vs "nothing found".
+FAMILY_SOURCES = {
+    "Geology": {"macrostrat"},
+    "Known sites": {"usgs-mrds", "wikidata-mines"},
+    "Structure": {"macrostrat-structure"},
+    "Research": {"openalex"},
+    "Magnetics": {"emag2"},
+    "Satellite": {"sentinel-2"},
+}
 
 
 def _rock_text(e: Evidence) -> str:
@@ -119,11 +149,22 @@ def _km(m: float) -> str:
     return f"{m / 1000:.1f} km"
 
 
-def assess(evidence: list[Evidence]) -> list[Assessment]:
+def assess(evidence: list[Evidence], checked: set[str] | None = None) -> list[Assessment]:
+    """checked: source ids that answered (with or without findings); None means all."""
     geology = [e for e in evidence if e.evidence_type == "mapped_geology"]
     fault = next((e for e in evidence if e.evidence_type == "structure"), None)
+    mag = next((e.raw_value for e in evidence if e.evidence_type == "magnetics"), None)
+    sat = next((e.raw_value for e in evidence if e.evidence_type == "alteration"), None)
+    terrain = next((e.raw_value for e in evidence if e.evidence_type == "terrain"), None)
     rocks = _rock_matches(geology)
     candidates = {e.commodity for e in evidence if e.commodity} | set(rocks)
+    mag_iron = bool(mag and mag["high_nt"] >= STRONG_MAG_NT)
+    if mag_iron:
+        candidates.add("Iron")
+
+    def answered(family: str) -> bool:
+        return checked is None or bool(FAMILY_SOURCES[family] & checked)
+
     results = []
     for commodity in candidates:
         related = [e for e in evidence if e.commodity == commodity]
@@ -181,6 +222,28 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
             score and commodity in STRUCTURAL and fault and fault.raw_value["nearest_km"] <= NEAR_KM
         )
         if fault_near:
+            score += 1
+        # A strong magnetic high is direct evidence for magnetite-rich iron.
+        iron_high = commodity == "Iron" and mag_iron
+        if iron_high:
+            score += 1
+        # Magnetic contacts and surface alteration strengthen existing evidence only.
+        mag_support = bool(
+            score
+            and not iron_high
+            and commodity in MAGNETIC
+            and mag
+            and mag["level"] in ("strong", "contacts")
+        )
+        if mag_support:
+            score += 1
+        altered = [
+            k
+            for k in ("iron", "clay")
+            if sat and commodity in ALTERATION[k] and sat.get(f"{k}_notable")
+        ]
+        sat_support = bool(score and altered)
+        if sat_support:
             score += 1
         if negative:
             category = Category.INSUFFICIENT
@@ -250,10 +313,100 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 f"A mapped fault {fault.raw_value['nearest_km']:.1f} km away could have channelled "
                 f"{commodity.lower()}-bearing fluids."
             )
+        if iron_high:
+            parts.append(
+                f"A strong magnetic high of {mag['high_nt']:g} nT, {mag['high_km']:g} km "
+                f"{mag['high_dir']}, can mark magnetite-rich rock."
+            )
+        if mag_support:
+            parts.append(
+                f"Magnetic contacts here (up to {mag['grad_max']:g} nT/km) fit the "
+                f"structure {commodity.lower()} deposits favour."
+            )
+        if sat_support:
+            found_text = " and ".join(
+                f"{ALTERATION_NAME[k]} over {sat[f'{k}_km2']:g} km²" for k in altered
+            )
+            parts.append(f"Satellite: {found_text} of bare ground.")
+        if score and commodity in PLACER and terrain and terrain["valley_pct"] >= 10:
+            parts.append(
+                f"Flat valley floors cover {terrain['valley_pct']:g}% of the area, where "
+                f"heavy {commodity.lower()} can collect."
+            )
         if negative:
             parts.append("Contradictory evidence is present and needs professional review.")
 
-        families = sum(bool(x) for x in (rock, sites, studied, confirmed))
+        families = sum(bool(x) for x in (rock, sites, studied, confirmed, sat_support))
+        breakdown = []
+
+        def row(layer: str, strength: int | None, note: str):
+            breakdown.append({"layer": layer, "strength": strength, "note": note})
+
+        if answered("Geology") or rock:
+            kind = rock["kind"] if rock else None
+            row(
+                "Geology",
+                {"direct": 100, "host": 70, "setting": 35}.get(kind, 0),
+                ", ".join(rock["terms"]) if rock else "No matching rock mapped",
+            )
+        else:
+            row("Geology", None, "No data")
+        if sites:
+            strength = min(100, 40 + 10 * len(sites) + 20 * bool(producers))
+            if nearest is not None and nearest <= NEAR_KM * 1000:
+                strength = min(100, strength + 15)
+            row("Known sites", strength, f"{len(sites)} within the radius")
+        elif regional:
+            row(
+                "Known sites",
+                25,
+                f"{regional[0].raw_value['name']}, {(regional[0].distance_m or 0) / 1000:.0f} km",
+            )
+        else:
+            row("Known sites", 0 if answered("Known sites") else None, "None recorded")
+        if commodity in STRUCTURAL:
+            if not answered("Structure") and not fault:
+                row("Structure", None, "No data")
+            elif fault_near:
+                row("Structure", 80, f"Fault {fault.raw_value['nearest_km']:.1f} km away")
+            elif fault and fault.raw_value.get("nearest_km") is not None:
+                row("Structure", 25, f"Nearest fault {fault.raw_value['nearest_km']:.1f} km")
+            else:
+                row("Structure", 0, "No mapped faults")
+        if commodity in MAGNETIC:
+            if not mag:
+                row("Magnetics", None, "No data")
+            elif iron_high:
+                row("Magnetics", 90, f"High of {mag['high_nt']:g} nT")
+            else:
+                row(
+                    "Magnetics",
+                    {"strong": 70, "contacts": 55, "quiet": 10}[mag["level"]],
+                    {"strong": "Strong contrast", "contacts": "Contacts", "quiet": "Quiet"}[
+                        mag["level"]
+                    ],
+                )
+        if any(commodity in v for v in ALTERATION.values()):
+            if not sat:
+                row("Satellite", None, "No data")
+            elif not sat.get("readable"):
+                row("Satellite", None, "Too much vegetation")
+            elif altered:
+                row("Satellite", 75, " and ".join(ALTERATION_NAME[k] for k in altered))
+            else:
+                row("Satellite", 10, "No standout alteration")
+        if studied:
+            row("Research", min(100, 50 + 25 * len(studied)), f"{len(studied)} studies")
+        elif papers:
+            row("Research", 30, f"{len(papers)} mentions")
+        else:
+            row("Research", 0 if answered("Research") else None, "No papers found")
+        if mine:
+            row(
+                "Your samples",
+                100 if confirmed else 30,
+                "Lab-confirmed" if confirmed else "Suspected",
+            )
         if families >= 2 and (len(sites) >= 3 or len(studied) >= 2):
             quality = "Good"
         elif families:
@@ -268,7 +421,8 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 explanation=" ".join(parts) or "Reported in a connected source.",
                 evidence_ids=[e.id for e in related]
                 + (rock["ids"] if rock else [])
-                + ([fault.id] if fault_near else []),
+                + ([fault.id] if fault_near else [])
+                + (["magnetics:emag2"] if iron_high or mag_support else []),
                 missing=MISSING,
                 score=score,
                 site_count=len(sites),
@@ -276,6 +430,7 @@ def assess(evidence: list[Evidence]) -> list[Assessment]:
                 producer_count=len(producers),
                 host_rocks=rock["terms"] if rock else [],
                 rock_kind=rock["kind"] if rock else None,
+                breakdown=breakdown,
                 samples=[
                     {
                         k: e.raw_value.get(k)
@@ -341,7 +496,8 @@ def build_analysis(
     occurrences = sorted(
         [o for p in providers for o in p.occurrences], key=lambda o: o["distance_m"]
     )
-    assessments = assess(evidence)
+    checked = {p.source.id for p in providers if p.status in ("available", "empty")}
+    assessments = assess(evidence, checked)
     # Map layers are large and derived; keep them out of the fingerprinted snapshots.
     snapshots = [provider.model_dump(exclude={"layers"}) for provider in providers]
     layers: dict = {}
@@ -416,6 +572,9 @@ def build_analysis(
             (e.raw_value for e in evidence if e.evidence_type == "structure"),
             {"nearest_km": None, "count": 0, "total_km": 0},
         ),
+        "magnetics": next((e.raw_value for e in evidence if e.evidence_type == "magnetics"), None),
+        "terrain": next((e.raw_value for e in evidence if e.evidence_type == "terrain"), None),
+        "satellite": next((e.raw_value for e in evidence if e.evidence_type == "alteration"), None),
         "rating": rated[0].prospectivity if rated else Category.INSUFFICIENT,
         "summary": summary,
         "coverage": [
@@ -424,7 +583,7 @@ def build_analysis(
         ]
         + [
             {"name": name, "status": "unavailable", "detail": "No verified dataset connected"}
-            for name in ["Geochemistry", "Geophysics", "Local assays", "Drilling"]
+            for name in ["Geochemistry", "Gravity", "Local assays", "Drilling"]
         ],
         "evidence_quality": "Limited" if geology else "Very Limited",
         "limitations": [

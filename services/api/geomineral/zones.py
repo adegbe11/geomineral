@@ -13,7 +13,7 @@ from shapely.geometry import LineString, Polygon
 from shapely.geometry import Point as SPoint
 from shapely.strtree import STRtree
 
-from .analysis import ROCK_RULES, STRUCTURAL
+from .analysis import ALTERATION, ROCK_RULES, STRUCTURAL
 
 SITE_KM = 3.0
 FAULT_KM = 1.5
@@ -60,6 +60,8 @@ def _summary(commodity: str, parts: list[dict]) -> list[str]:
         out.append("Includes your lab-confirmed sample")
     if faults:
         out.append(f"Mapped fault as close as {min(faults):.1f} km")
+    if any(p.get("alteration") for p in parts):
+        out.append("Satellite alteration on bare ground")
     return out
 
 
@@ -92,6 +94,9 @@ def build_zones(
         if len(path) >= 2
     ]
     fault_tree = STRtree(faults) if faults else None
+    alteration = [
+        (fwd(a["lng"], a["lat"]), a["kind"], a["frac"]) for a in layers.get("alteration", [])
+    ]
 
     cell = max(1.0, radius_km / 12)
     n = int(math.ceil(radius_km / cell))
@@ -129,7 +134,12 @@ def build_zones(
         # Only evidence types that exist in this area count towards the full scale.
         has_rock = any(u and _rock_kind(u[0], commodity) for u in under.values())
         has_fault = commodity in STRUCTURAL and bool(fault_d)
-        scale = 0.4 + (0.45 if has_rock else 0) + (0.15 if has_fault else 0)
+        kinds = {k for k, v in ALTERATION.items() if commodity in v}
+        alt = [(p, f) for p, k, f in alteration if k in kinds]
+        has_alt = bool(alt)
+        scale = (
+            0.4 + (0.45 if has_rock else 0) + (0.15 if has_fault else 0) + (0.2 if has_alt else 0)
+        )
         cells, reasons = [], {}
         for c in centres:
             why: dict = {"rock": None, "sites": set(), "producer": False, "fault": None}
@@ -156,7 +166,15 @@ def build_zones(
                     why["fault"] = fault_d[c]
                 elif fault_d[c] <= 2 * FAULT_KM:
                     f = 0.5
-            score = round((0.45 * g + 0.4 * s + 0.15 * f) / scale, 3)
+            a = 0.0
+            if has_alt and (g or s):
+                near_alt = [fr for p, fr in alt if math.dist(p, c) <= cell * 0.75]
+                if near_alt:
+                    # A quarter of the bare ground altered counts as a full signal.
+                    a = min(1.0, max(near_alt) / 0.25)
+                    if a >= 0.4:
+                        why["alteration"] = True
+            score = round((0.45 * g + 0.4 * s + 0.15 * f + 0.2 * a) / scale, 3)
             if score >= 0.15:
                 cells.append((c, score))
                 reasons[c] = why

@@ -391,6 +391,7 @@ function MineralRow({ m, guide }: { m: Assessment; guide: (q: string) => void })
           <RatingPill rating={m.prospectivity} />
         </View>
         <Text style={ui.body}>{m.explanation}</Text>
+        {!!m.breakdown?.length && <Breakdown rows={m.breakdown} />}
         {!!m.samples?.length && (
           <View style={{ gap: 6, marginTop: 2 }}>
             <Text style={ui.caption}>Your samples</Text>
@@ -451,6 +452,56 @@ function MineralRow({ m, guide }: { m: Assessment; guide: (q: string) => void })
   );
 }
 
+// One bar per evidence layer; "No data" stays distinct from "nothing found".
+function Breakdown({ rows }: { rows: NonNullable<Assessment["breakdown"]> }) {
+  const { c, ui } = useTheme();
+  return (
+    <View style={{ gap: 7, marginTop: 2 }} accessibilityLabel="Evidence by layer">
+      <Text style={ui.caption}>Evidence</Text>
+      {rows.map((r) => (
+        <View key={r.layer} style={[ui.row, { gap: 10 }]}>
+          <Text style={[ui.small, { width: 92, color: c.label }]} numberOfLines={1}>
+            {r.layer}
+          </Text>
+          <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.fill, overflow: "hidden" }}>
+            {r.strength !== null && (
+              <View
+                style={{
+                  width: `${Math.max(r.strength, 2)}%`,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: r.strength >= 60 ? c.tint : r.strength >= 25 ? "#F2A33A" : c.tertiary,
+                }}
+              />
+            )}
+          </View>
+          <Text style={[ui.small, { width: 34, textAlign: "right" }]}>
+            {r.strength === null ? "–" : r.strength}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const monthYear = (iso: string) => {
+  const [y, m] = iso.split("-").map(Number);
+  return y && m ? `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]} ${y}` : iso;
+};
+
+function LayerRow({ color, title, detail }: { color: string; title: string; detail: string }) {
+  const { ui } = useTheme();
+  return (
+    <View style={[ui.card, ui.row, { gap: 12 }]}>
+      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={ui.h3}>{title}</Text>
+        <Text style={ui.small}>{detail}</Text>
+      </View>
+    </View>
+  );
+}
+
 function Stat({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
   const { ui } = useTheme();
   return (
@@ -471,6 +522,9 @@ const STAGES = [
   ["wikidata-mines", "Known mines worldwide"],
   ["openalex", "Published research"],
   ["macrostrat-structure", "Faults and structure"],
+  ["emag2", "Magnetics"],
+  ["terrain", "Terrain"],
+  ["sentinel-2", "Satellite scan"],
 ] as const;
 const STAGE_NOTE: Record<string, string> = {
   empty: "Nothing recorded here",
@@ -737,6 +791,35 @@ export function AnalysisScreen({
                           : `No mapped faults within ${a.radius_km} km`}
                       </Text>
                     </View>
+                    {a.magnetics && (
+                      <LayerRow
+                        color="#7B61FF"
+                        title={
+                          { strong: "Strong Magnetic Contrast", contacts: "Magnetic Contacts", quiet: "Magnetically Quiet" }[
+                            a.magnetics.level
+                          ]
+                        }
+                        detail={`${a.magnetics.pin_nt} nT at the pin · high ${a.magnetics.high_nt} nT, ${a.magnetics.high_km} km ${a.magnetics.high_dir}`}
+                      />
+                    )}
+                    {a.satellite && (
+                      <LayerRow
+                        color="#E2552F"
+                        title={a.satellite.readable ? "Satellite Alteration" : "Satellite: Covered by Vegetation"}
+                        detail={
+                          a.satellite.readable
+                            ? `Iron oxide ${a.satellite.iron_km2} km² · clay ${a.satellite.clay_km2} km² · ${a.satellite.bare_pct}% bare · ${monthYear(a.satellite.date)}`
+                            : `${a.satellite.bare_pct}% bare ground · ${monthYear(a.satellite.date)}`
+                        }
+                      />
+                    )}
+                    {a.terrain && (
+                      <LayerRow
+                        color="#3FA36B"
+                        title={`Elevation ${a.terrain.pin_m} m`}
+                        detail={`Relief ${a.terrain.relief_m} m · valley floors ${a.terrain.valley_pct}% · steep ground ${a.terrain.steep_pct}%`}
+                      />
+                    )}
                     {!a.geology_units?.length && <Empty title="No mapped geology" description="" />}
                     {a.geology_units?.map((u, i) => (
                       <FadeIn key={i} index={i}>

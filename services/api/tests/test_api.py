@@ -465,9 +465,52 @@ def test_stalled_source_is_cut_off(monkeypatch):
         providers.LiteratureProvider,
         providers.StructureProvider,
         providers.WikidataMinesProvider,
+        providers.MagneticsProvider,
+        providers.TerrainProvider,
+        providers.SatelliteProvider,
     ):
         monkeypatch.setattr(cls, "fetch", stall)
     monkeypatch.setattr(providers, "PROVIDER_DEADLINE", 0.05)
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = asyncio.run(providers.collect(Point(lat=0, lng=0), 5, set()))
     assert {r.status for r in results} == {"unavailable"}
+
+
+def test_search_falls_back_to_fuzzy_geocoder_keeping_typed_spelling(clients, monkeypatch):
+    import httpx
+    from geomineral import main
+
+    main.geocoder_cache.clear()
+    real = httpx.AsyncClient
+
+    def handler(request):
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(200, json=[])
+        feature = {
+            "geometry": {"coordinates": [6.21, 7.17]},
+            "properties": {
+                "osm_key": "place",
+                "name": "Uhomora",
+                "county": "Owan West",
+                "state": "Edo State",
+                "country": "Nigeria",
+                "countrycode": "NG",
+            },
+        }
+        cafe = {
+            "geometry": {"coordinates": [14.4, 50.1]},
+            "properties": {"osm_key": "amenity", "name": "U Houmra", "country": "Czechia"},
+        }
+        return httpx.Response(200, json={"features": [feature, cafe]})
+
+    monkeypatch.setattr(main, "last_geocode", 0.0)
+    monkeypatch.setattr(
+        main.httpx,
+        "AsyncClient",
+        lambda **kw: real(transport=httpx.MockTransport(handler), **kw),
+    )
+    a, _, _ = clients
+    places = a.get("/api/search", params={"q": "uhonmora"}).json()
+    assert places[0]["name"] == "Uhonmora, Owan West, Edo State, Nigeria"
+    assert places[0]["country_code"] == "NG"
+    assert len(places) == 1
