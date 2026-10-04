@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -133,6 +134,9 @@ function TabBar({
 
 function Shell() {
   const w = useWorkspace();
+  const win = useWindowDimensions();
+  // The whole globe fits: most of the width, never more than half the height.
+  const globe = Math.min(win.width - 48, win.height * 0.48, 460);
   const { c, ui, dark } = useTheme();
   const [stack, setStack] = useState<Route[]>([]),
     [auth, setAuth] = useState(false),
@@ -299,23 +303,28 @@ function Shell() {
         </View>
       ) : !w.welcomed ? (
         <View style={{ flex: 1, backgroundColor: "#031310" }}>
-          <OrbitingEarth
-            style={{
-              position: "absolute",
-              top: -40,
-              left: "50%",
-              marginLeft: -290,
-              width: 580,
-              height: 580,
-              borderRadius: 290,
-            }}
-          />
           <LinearGradient
-            colors={["transparent", "#041713", "#041713"]}
-            locations={[0, 0.66, 1]}
+            colors={["#020B09", "#031310", "#041713"]}
+            locations={[0, 0.5, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={{ flex: 1, justifyContent: "flex-end", padding: 24, gap: 14, paddingBottom: 30 }}>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 24 }}>
+            <View
+              style={{
+                width: globe,
+                height: globe,
+                borderRadius: globe / 2,
+                shadowColor: "#4F8BFF",
+                shadowOpacity: 0.45,
+                shadowRadius: 28,
+                shadowOffset: { width: 0, height: 0 },
+                elevation: 0,
+              }}
+            >
+              <OrbitingEarth disc style={{ width: globe, height: globe }} />
+            </View>
+          </View>
+          <View style={{ justifyContent: "flex-end", padding: 24, gap: 14, paddingBottom: 30 }}>
             <FadeIn delay={150}>
               <Brand large light />
             </FadeIn>

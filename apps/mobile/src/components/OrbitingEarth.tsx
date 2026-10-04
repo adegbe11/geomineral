@@ -12,10 +12,13 @@ import {
 export default function OrbitingEarth({
   style,
   zoom,
+  disc,
 }: {
   style: StyleProp<ImageStyle>;
   /** Optional scale driven by the caller (Analyze zoom). */
   zoom?: Animated.Value;
+  /** The whole globe cut out on transparency, for screens that show it in full. */
+  disc?: boolean;
 }) {
   const spin = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState(true);
@@ -66,7 +69,7 @@ export default function OrbitingEarth({
     <Animated.Image
       accessible={false}
       testID="orbiting-earth"
-      source={require("../../assets/earth.jpg")}
+      source={disc ? require("../../assets/earth-disc.png") : require("../../assets/earth.jpg")}
       style={[
         style,
         {
