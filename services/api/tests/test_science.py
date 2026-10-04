@@ -106,7 +106,7 @@ def test_summary_names_best_signal_and_site_count():
     assert "1 recorded mineral sites within 25 km" in result["summary"]
 
 
-def test_generic_sedimentary_rock_is_only_possible_clay_and_sand():
+def test_generic_sedimentary_rock_suggests_nothing_on_its_own():
     host = Evidence(
         id="host",
         source_id="fixture",
@@ -115,10 +115,38 @@ def test_generic_sedimentary_rock_is_only_possible_clay_and_sand():
         description="Synthetic generic sediment",
         raw_value={"lith": "sedimentary"},
     )
-    found = {a.commodity: a for a in assess([host])}
-    assert set(found) == {"Clay", "Sand and gravel"}
-    assert all(a.prospectivity == "Low" for a in found.values())
-    assert "common in sedimentary rocks" in found["Clay"].explanation
+    assert assess([host]) == []
+
+
+def _model(mineral: str, top_pct: float) -> Evidence:
+    return Evidence(
+        id=f"model:{mineral}",
+        source_id="ground-model",
+        feature_id=mineral,
+        evidence_type="ground_model",
+        commodity=mineral,
+        description="Synthetic model score",
+        raw_value={
+            "mineral": mineral,
+            "top_pct": top_pct,
+            "probability": 0.5,
+            "deposit_pct": 60,
+            "auc": 0.82,
+            "layers": {"Geology": 0.2, "Magnetics": 0.05, "Terrain": 0.01},
+        },
+    )
+
+
+def test_ground_model_proposes_minerals_only_when_ground_ranks_high():
+    found = {
+        a.commodity: a
+        for a in assess([_model("Gold", 1.5), _model("Tin", 8), _model("Lithium", 40)])
+    }
+    assert set(found) == {"Gold", "Tin"}
+    assert found["Gold"].prospectivity == "Moderate" and found["Tin"].prospectivity == "Low"
+    assert "top 1.5% of land for gold, judged by its geology" in found["Gold"].explanation
+    row = next(b for b in found["Gold"].breakdown if b["layer"] == "Ground model")
+    assert row["strength"] == 98
 
 
 def test_unavailable_is_not_empty_and_no_percentage_claims():
@@ -254,11 +282,12 @@ async def test_provider_failure_is_isolated(monkeypatch):
         providers.MagneticsProvider,
         providers.TerrainProvider,
         providers.SatelliteProvider,
+        providers.GroundModelProvider,
     ):
         monkeypatch.setattr(cls, "fetch", empty)
     monkeypatch.setattr(providers, "LIVE_PROVIDERS", True)
     results = await providers.collect(Point(lat=0, lng=0), 25, set())
-    assert [r.status for r in results] == ["unavailable"] + ["empty"] * 7
+    assert [r.status for r in results] == ["unavailable"] + ["empty"] * 8
 
 
 async def test_deep_time_marks_unplaced_points_and_caches(monkeypatch):

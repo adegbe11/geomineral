@@ -6,14 +6,13 @@ import re
 
 from .schemas import AnalysisRequest, Assessment, Category, Evidence, ProviderResult, now
 
-MODEL_VERSION = "screening-0.3.0"
+MODEL_VERSION = "screening-0.4.0"
 MISSING = [
     "No verified local assay results",
     "No drilling evidence",
     "No verified local structural or alteration model",
 ]
 # "direct": the mapped rock is itself the commodity. "host": the rock commonly hosts it.
-# "setting": a broad rock class where the material is common (only ever "possible").
 # Terms are matched against a map unit's lithology and name only.
 ROCK_RULES = [
     {"commodities": ["Limestone"], "terms": ["limestone"], "kind": "direct"},
@@ -30,6 +29,7 @@ ROCK_RULES = [
     },
     {"commodities": ["Graphite"], "terms": ["graphite", "graphitic"], "kind": "direct"},
     {"commodities": ["Phosphate"], "terms": ["phosphorite"], "kind": "direct"},
+    {"commodities": ["Coal"], "terms": ["coal", "lignite"], "kind": "direct"},
     {
         "commodities": ["Gold"],
         "terms": ["greenstone", "metavolcanic", "quartz vein", "turbidite"],
@@ -46,28 +46,6 @@ ROCK_RULES = [
     {"commodities": ["Rare earth elements", "Niobium"], "terms": ["carbonatite"], "kind": "host"},
     {"commodities": ["Diamond"], "terms": ["kimberlite", "lamproite"], "kind": "host"},
     {"commodities": ["Aluminium"], "terms": ["laterite"], "kind": "host"},
-    {
-        "commodities": ["Clay", "Sand and gravel"],
-        "terms": ["sedimentary", "alluvium", "alluvial", "sandstone", "unconsolidated"],
-        "kind": "setting",
-    },
-    {
-        "commodities": ["Crushed stone"],
-        "terms": [
-            "granite",
-            "granitic",
-            "gneiss",
-            "basement",
-            "igneous",
-            "plutonic",
-            "metamorphic",
-            "basalt",
-            "migmatite",
-            "charnockite",
-            "quartzite",
-        ],
-        "kind": "setting",
-    },
 ]
 KIND_RANK = {"setting": 0, "host": 1, "direct": 2}
 RANK = {Category.HIGH: 3, Category.MODERATE: 2, Category.LOW: 1, Category.INSUFFICIENT: 0}
@@ -119,7 +97,11 @@ FAMILY_SOURCES = {
     "Research": {"openalex"},
     "Magnetics": {"emag2"},
     "Satellite": {"sentinel-2"},
+    "Ground model": {"ground-model"},
 }
+# Learned model: top share of land this ground ranks in for a mineral (held-out calibrated).
+MODEL_STRONG_PCT = 2
+MODEL_PCT = 10
 
 
 def _rock_text(e: Evidence) -> str:
@@ -157,7 +139,12 @@ def assess(evidence: list[Evidence], checked: set[str] | None = None) -> list[As
     sat = next((e.raw_value for e in evidence if e.evidence_type == "alteration"), None)
     terrain = next((e.raw_value for e in evidence if e.evidence_type == "terrain"), None)
     rocks = _rock_matches(geology)
-    candidates = {e.commodity for e in evidence if e.commodity} | set(rocks)
+    models = {e.commodity: e.raw_value for e in evidence if e.evidence_type == "ground_model"}
+    candidates = {
+        e.commodity for e in evidence if e.commodity and e.evidence_type != "ground_model"
+    } | set(rocks)
+    # The learned model proposes minerals on its own when the ground ranks highly.
+    candidates |= {m for m, r in models.items() if r["top_pct"] <= MODEL_PCT}
     mag_iron = bool(mag and mag["high_nt"] >= STRONG_MAG_NT)
     if mag_iron:
         candidates.add("Iron")
@@ -214,6 +201,13 @@ def assess(evidence: list[Evidence], checked: set[str] | None = None) -> list[As
         # A mine elsewhere in the region says the ground can carry it; never more than possible.
         if regional and score == 0:
             score = 1
+        gm = models.get(commodity)
+        model_points = 0
+        if gm and gm["top_pct"] <= MODEL_STRONG_PCT:
+            model_points = 2
+        elif gm and gm["top_pct"] <= MODEL_PCT:
+            model_points = 1
+        score += model_points
         # A laboratory result from the user's own sample is the strongest local evidence.
         if confirmed:
             score += 2
@@ -313,6 +307,12 @@ def assess(evidence: list[Evidence], checked: set[str] | None = None) -> list[As
                 f"A mapped fault {fault.raw_value['nearest_km']:.1f} km away could have channelled "
                 f"{commodity.lower()}-bearing fluids."
             )
+        if model_points:
+            best = max(gm["layers"], key=lambda k: gm["layers"][k])
+            parts.append(
+                f"The ground here ranks in the top {gm['top_pct']:g}% of land for "
+                f"{commodity.lower()}, judged by its {best.lower()} and the rest of its makeup."
+            )
         if iron_high:
             parts.append(
                 f"A strong magnetic high of {mag['high_nt']:g} nT, {mag['high_km']:g} km "
@@ -336,7 +336,9 @@ def assess(evidence: list[Evidence], checked: set[str] | None = None) -> list[As
         if negative:
             parts.append("Contradictory evidence is present and needs professional review.")
 
-        families = sum(bool(x) for x in (rock, sites, studied, confirmed, sat_support))
+        families = sum(
+            bool(x) for x in (rock, sites, studied, confirmed, sat_support, model_points)
+        )
         breakdown = []
 
         def row(layer: str, strength: int | None, note: str):
@@ -401,6 +403,10 @@ def assess(evidence: list[Evidence], checked: set[str] | None = None) -> list[As
             row("Research", 30, f"{len(papers)} mentions")
         else:
             row("Research", 0 if answered("Research") else None, "No papers found")
+        if gm:
+            row("Ground model", max(0, round(100 - gm["top_pct"])), f"Top {gm['top_pct']:g}%")
+        elif not answered("Ground model"):
+            row("Ground model", None, "No data")
         if mine:
             row(
                 "Your samples",

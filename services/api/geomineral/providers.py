@@ -14,6 +14,7 @@ from .geo import distance_m
 from .geophysics import EMAG2, MagneticsProvider
 from .literature import OPENALEX, LiteratureProvider
 from .mines import WIKIDATA, WikidataMinesProvider
+from .model import GROUND_MODEL, GroundModelProvider
 from .satellite import SENTINEL2, SatelliteProvider
 from .schemas import Evidence, Point, ProviderResult, Source
 from .structure import STRUCTURE, StructureProvider
@@ -44,7 +45,17 @@ MRDS = Source(
     resolution="Point locations; positional accuracy varies by record",
     notes="Historical compilation. Records may be incomplete or outdated; a mine record does not establish current activity.",
 )
-SOURCES = [MACROSTRAT, MRDS, WIKIDATA, OPENALEX, STRUCTURE, EMAG2, TERRAIN, SENTINEL2]
+SOURCES = [
+    MACROSTRAT,
+    MRDS,
+    WIKIDATA,
+    OPENALEX,
+    STRUCTURE,
+    EMAG2,
+    TERRAIN,
+    SENTINEL2,
+    GROUND_MODEL,
+]
 WFS_URL = "https://mrdata.usgs.gov/services/wfs/mrds"
 MS_NS = "http://mapserver.gis.umn.edu/mapserver"
 GML_NS = "http://www.opengis.net/gml"
@@ -288,6 +299,7 @@ async def collect(
         MagneticsProvider(),
         TerrainProvider(),
         SatelliteProvider(),
+        GroundModelProvider(),
         *COUNTRY_PROVIDERS.get(location.country_code or "", []),
     ]
     async with httpx.AsyncClient(

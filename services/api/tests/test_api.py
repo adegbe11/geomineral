@@ -468,6 +468,7 @@ def test_stalled_source_is_cut_off(monkeypatch):
         providers.MagneticsProvider,
         providers.TerrainProvider,
         providers.SatelliteProvider,
+        providers.GroundModelProvider,
     ):
         monkeypatch.setattr(cls, "fetch", stall)
     monkeypatch.setattr(providers, "PROVIDER_DEADLINE", 0.05)

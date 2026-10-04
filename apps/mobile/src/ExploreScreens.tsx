@@ -525,6 +525,7 @@ const STAGES = [
   ["emag2", "Magnetics"],
   ["terrain", "Terrain"],
   ["sentinel-2", "Satellite scan"],
+  ["ground-model", "Ground model"],
 ] as const;
 const STAGE_NOTE: Record<string, string> = {
   empty: "Nothing recorded here",

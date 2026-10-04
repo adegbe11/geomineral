@@ -34,7 +34,9 @@ export default function ZonesScreen({ back }: { back: () => void }) {
   const { c, ui } = useTheme();
   const a = w.analysis;
   const zones = a?.zones?.by_commodity ?? {};
-  const minerals = Object.keys(zones);
+  // Strongest target first, so the screen never opens on an empty map.
+  const best = (m: string) => Math.max(0, ...zones[m].targets.map((t) => t.score));
+  const minerals = Object.keys(zones).sort((x, y) => best(y) - best(x));
   const [mineral, setMineral] = useState(minerals[0] ?? "");
   const [selected, setSelected] = useState<string>();
   const zone = zones[mineral];

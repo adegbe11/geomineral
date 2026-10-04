@@ -13,3 +13,4 @@ Pillow>=11.3,<13
 mapbox-vector-tile>=2.2,<3
 numpy>=2.0,<3
 rasterio>=1.4,<2
+scikit-learn>=1.5,<2

@@ -1,0 +1,273 @@
+{
+ "features": [
+  "lith_granite",
+  "lith_felsic_intrusive",
+  "lith_mafic_intrusive",
+  "lith_ultramafic",
+  "lith_felsic_volcanic",
+  "lith_mafic_volcanic",
+  "lith_volcanic",
+  "lith_plutonic",
+  "lith_greenstone",
+  "lith_schist",
+  "lith_gneiss",
+  "lith_quartzite",
+  "lith_metamorphic",
+  "lith_carbonate",
+  "lith_sandstone",
+  "lith_shale",
+  "lith_black_shale",
+  "lith_coal",
+  "lith_evaporite",
+  "lith_iron_formation",
+  "lith_laterite",
+  "lith_unconsolidated",
+  "lith_sedimentary",
+  "lith_pegmatite",
+  "lith_kimberlite",
+  "lith_carbonatite",
+  "lith_porphyry",
+  "lith_chert",
+  "lith_ophiolite",
+  "lith_crystalline",
+  "age_cenozoic",
+  "age_mesozoic",
+  "age_paleozoic",
+  "age_proterozoic",
+  "age_archean",
+  "age_top",
+  "age_bottom",
+  "units",
+  "mag_pin",
+  "mag_max",
+  "mag_min",
+  "mag_std",
+  "mag_grad_max",
+  "mag_grad_mean",
+  "elev",
+  "relief",
+  "slope_mean",
+  "slope_steep"
+ ],
+ "block_deg": 2.0,
+ "ship_auc": 0.75,
+ "minerals": {
+  "Aluminium": {
+   "auc": 0.733,
+   "auc_outside_us": 0.722,
+   "positives": 649,
+   "negatives": 19965,
+   "shipped": false
+  },
+  "Antimony": {
+   "auc": 0.833,
+   "auc_outside_us": 0.828,
+   "positives": 624,
+   "negatives": 19904,
+   "shipped": true
+  },
+  "Barite": {
+   "auc": 0.752,
+   "auc_outside_us": 0.753,
+   "positives": 629,
+   "negatives": 19903,
+   "shipped": true
+  },
+  "Chromium": {
+   "auc": 0.791,
+   "auc_outside_us": 0.749,
+   "positives": 648,
+   "negatives": 20058,
+   "shipped": true
+  },
+  "Clay": {
+   "auc": 0.834,
+   "auc_outside_us": 0.728,
+   "positives": 616,
+   "negatives": 19618,
+   "shipped": true
+  },
+  "Cobalt": {
+   "auc": 0.711,
+   "auc_outside_us": 0.707,
+   "positives": 645,
+   "negatives": 20026,
+   "shipped": false
+  },
+  "Copper": {
+   "auc": 0.785,
+   "auc_outside_us": 0.784,
+   "positives": 2613,
+   "negatives": 15493,
+   "shipped": true
+  },
+  "Diamond": {
+   "auc": 0.87,
+   "auc_outside_us": 0.88,
+   "positives": 371,
+   "negatives": 20634,
+   "shipped": true
+  },
+  "Fluorite": {
+   "auc": 0.801,
+   "auc_outside_us": 0.811,
+   "positives": 644,
+   "negatives": 19974,
+   "shipped": true
+  },
+  "Gold": {
+   "auc": 0.746,
+   "auc_outside_us": 0.725,
+   "positives": 2181,
+   "negatives": 15738,
+   "shipped": false
+  },
+  "Graphite": {
+   "auc": 0.765,
+   "auc_outside_us": 0.725,
+   "positives": 451,
+   "negatives": 20400,
+   "shipped": true
+  },
+  "Gypsum": {
+   "auc": 0.839,
+   "auc_outside_us": 0.766,
+   "positives": 604,
+   "negatives": 20140,
+   "shipped": true
+  },
+  "Iron": {
+   "auc": 0.678,
+   "auc_outside_us": 0.677,
+   "positives": 961,
+   "negatives": 18262,
+   "shipped": false
+  },
+  "Kaolin": {
+   "auc": 0.757,
+   "auc_outside_us": 0.7,
+   "positives": 459,
+   "negatives": 20362,
+   "shipped": true
+  },
+  "Lead": {
+   "auc": 0.817,
+   "auc_outside_us": 0.824,
+   "positives": 1854,
+   "negatives": 16843,
+   "shipped": true
+  },
+  "Limestone": {
+   "auc": 0.783,
+   "auc_outside_us": 0.779,
+   "positives": 608,
+   "negatives": 19777,
+   "shipped": true
+  },
+  "Lithium": {
+   "auc": 0.716,
+   "auc_outside_us": 0.696,
+   "positives": 218,
+   "negatives": 20729,
+   "shipped": false
+  },
+  "Manganese": {
+   "auc": 0.716,
+   "auc_outside_us": 0.693,
+   "positives": 662,
+   "negatives": 19422,
+   "shipped": false
+  },
+  "Molybdenum": {
+   "auc": 0.75,
+   "auc_outside_us": 0.745,
+   "positives": 671,
+   "negatives": 19604,
+   "shipped": true
+  },
+  "Nickel": {
+   "auc": 0.81,
+   "auc_outside_us": 0.82,
+   "positives": 926,
+   "negatives": 19684,
+   "shipped": true
+  },
+  "Niobium": {
+   "auc": 0.82,
+   "auc_outside_us": 0.762,
+   "positives": 339,
+   "negatives": 20507,
+   "shipped": true
+  },
+  "Phosphate": {
+   "auc": 0.72,
+   "auc_outside_us": 0.705,
+   "positives": 641,
+   "negatives": 20089,
+   "shipped": false
+  },
+  "Platinum": {
+   "auc": 0.808,
+   "auc_outside_us": 0.805,
+   "positives": 684,
+   "negatives": 20022,
+   "shipped": true
+  },
+  "Rare earth elements": {
+   "auc": 0.852,
+   "auc_outside_us": 0.748,
+   "positives": 485,
+   "negatives": 20314,
+   "shipped": true
+  },
+  "Silver": {
+   "auc": 0.835,
+   "auc_outside_us": 0.834,
+   "positives": 2216,
+   "negatives": 16154,
+   "shipped": true
+  },
+  "Tantalum": {
+   "auc": 0.823,
+   "auc_outside_us": 0.763,
+   "positives": 294,
+   "negatives": 20586,
+   "shipped": true
+  },
+  "Tin": {
+   "auc": 0.786,
+   "auc_outside_us": 0.783,
+   "positives": 735,
+   "negatives": 19870,
+   "shipped": true
+  },
+  "Titanium": {
+   "auc": 0.794,
+   "auc_outside_us": 0.811,
+   "positives": 658,
+   "negatives": 20037,
+   "shipped": true
+  },
+  "Tungsten": {
+   "auc": 0.794,
+   "auc_outside_us": 0.793,
+   "positives": 737,
+   "negatives": 19407,
+   "shipped": true
+  },
+  "Uranium": {
+   "auc": 0.823,
+   "auc_outside_us": 0.723,
+   "positives": 704,
+   "negatives": 19497,
+   "shipped": true
+  },
+  "Zinc": {
+   "auc": 0.803,
+   "auc_outside_us": 0.808,
+   "positives": 1585,
+   "negatives": 17341,
+   "shipped": true
+  }
+ }
+}
