@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import CrystalShimmer from "./components/CrystalShimmer";
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { BookOpen, ChevronRight, FlaskConical, Folder, UserRound } from "lucide-react-native";
 import { Brand, MineralArt } from "./components/Primitives";
+import GlassFill from "./components/Glass";
 import OrbitingEarth from "./components/OrbitingEarth";
 import PlaceSearch from "./components/PlaceSearch";
 import { minerals, pretty } from "./minerals";
@@ -46,7 +46,7 @@ const sentence = (text: string) => {
 function Glass({ children, style }: { children: ReactNode; style?: object }) {
   return (
     <View style={[s.glass, style]}>
-      <BlurView intensity={36} tint="dark" style={StyleSheet.absoluteFill} />
+      <GlassFill intensity={36} dark solid="#0E1F19" />
       {children}
     </View>
   );

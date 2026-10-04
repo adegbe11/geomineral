@@ -17,9 +17,9 @@ const light = {
   gold: "#A87A1F",
   danger: "#D7372F",
   glass: "rgba(250,251,248,0.72)",
-  glassBorder: "rgba(255,255,255,0.7)",
+  glassBorder: "rgba(17,24,19,0.12)",
   hero: "#0B2A24",
-  shadow: "0px 1px 2px rgba(17,24,19,0.04), 0px 8px 24px rgba(17,24,19,0.06)",
+  shadow: "0px 1px 2px rgba(17,24,19,0.04)",
 };
 export type Palette = typeof light;
 const dark: Palette = {
@@ -38,7 +38,7 @@ const dark: Palette = {
   gold: "#E0B355",
   danger: "#FF6961",
   glass: "rgba(28,28,30,0.66)",
-  glassBorder: "rgba(255,255,255,0.1)",
+  glassBorder: "rgba(255,255,255,0.16)",
   hero: "#06150F",
   shadow: "0px 0px 0px rgba(0,0,0,0)",
 };
@@ -96,6 +96,8 @@ const makeUi = (c: Palette) =>
       borderRadius: 22,
       borderCurve: "continuous",
       gap: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.separator,
       boxShadow: c.shadow,
     },
     field: {

@@ -108,6 +108,8 @@ export function Header({
         justifyContent: "space-between",
         alignItems: "center",
         backgroundColor: dark ? "transparent" : c.bg,
+        borderBottomWidth: dark ? 0 : 0.5,
+        borderBottomColor: c.separator,
       }}
     >
       <View style={{ width: 64 }}>

@@ -1,4 +1,3 @@
-import { BlurView } from "expo-blur";
 import * as LocationService from "expo-location";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -24,6 +23,7 @@ import {
   X,
 } from "lucide-react-native";
 import DeepTime from "./components/DeepTime";
+import GlassFill from "./components/Glass";
 import LandStatus from "./components/LandStatus";
 import NativeMap from "./components/NativeMap";
 import PlaceSearch from "./components/PlaceSearch";
@@ -266,7 +266,7 @@ export function Explore({
           { borderColor: c.glassBorder, backgroundColor: c.glass, transform: [{ translateY: rise }] },
         ]}
       >
-        <BlurView intensity={60} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+        <GlassFill intensity={60} dark={dark} solid={c.card} />
         <View style={[s.grabber, { backgroundColor: c.tertiary }]} />
         <FadeIn key={sheetKey} style={{ gap: 14 }}>
           {site ? (

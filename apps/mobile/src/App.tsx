@@ -1,4 +1,3 @@
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,6 +19,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Camera, Compass, Folder, Home, UserRound, X } from "lucide-react-native";
 import { Brand, Button, Header } from "./components/Primitives";
 import { AnalysisScreen, Explore, ReportScreen } from "./ExploreScreens";
+import GlassFill from "./components/Glass";
 import OrbitingEarth from "./components/OrbitingEarth";
 import PlaceSearch from "./components/PlaceSearch";
 import HomeScreen from "./HomeScreen";
@@ -91,7 +91,7 @@ function TabBar({
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       style={[styles.nav, { backgroundColor: c.glass, borderColor: c.glassBorder }]}
     >
-      <BlurView intensity={70} tint={dark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
+      <GlassFill intensity={70} dark={dark} solid={onDark ? "#161A18" : theme.c.card} />
       {!!seg && (
         <Animated.View
           style={{
@@ -108,6 +108,8 @@ function TabBar({
       )}
       {TABS.map(([name, Icon]) => {
         const on = tab === name;
+        // Scan is the app's headline action: the iOS 27 "prominent" tab.
+        const prominent = name === "Scan";
         return (
           <Pressable
             accessibilityRole="tab"
@@ -121,7 +123,24 @@ function TabBar({
             }}
             style={styles.navItem}
           >
-            <Icon size={22} color={on ? c.tint : c.label} strokeWidth={on ? 2.4 : 1.8} />
+            {prominent ? (
+              <View
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: c.tint,
+                  // Same footprint as a 22 pt icon, so every label sits on one line.
+                  marginVertical: -6,
+                }}
+              >
+                <Icon size={19} color={onDark ? "#03140B" : theme.c.onTint} strokeWidth={2.4} />
+              </View>
+            ) : (
+              <Icon size={22} color={on ? c.tint : c.label} strokeWidth={on ? 2.4 : 1.8} />
+            )}
             <Text style={{ ...type.caption2, fontWeight: "600", color: on ? c.tint : c.label }}>
               {name}
             </Text>
@@ -571,7 +590,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 0.5,
     overflow: "hidden",
-    boxShadow: "0px 10px 30px rgba(0,0,0,0.18)",
+    boxShadow: "0px 4px 14px rgba(0,0,0,0.10)",
   },
   navItem: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2, minHeight: 52 },
 });
